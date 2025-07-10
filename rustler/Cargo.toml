@@ -1,0 +1,27 @@
+[package]
+name = "rustler"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "rustler"
+crate-type = ["cdylib"]
+
+[dependencies]
+polars = {version = "*",  features = ["parquet", "lazy"]}
+parquet = "*"
+serde_json = "*"
+glob = "*"
+anyhow = "*"
+itertools = "*"
+serde = { version = "*", features = ["derive"] }
+rand = "0.9.1"
+clap = { version = "*", features = ["derive"] }
+pyo3 = { version = "*", features = ["abi3-py312"] }
+memmap2 = "*"
+rkyv = "*"
+numpy = { version = "*", features = ["half"] }
+structview = "*"
+indicatif = "*"
+rayon = "1.10.0"
+half = { version = "*", features = ["rkyv"] }
