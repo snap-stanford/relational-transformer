@@ -11,7 +11,7 @@ git clone https://github.com/snap-stanford/relational_transformer
 
 3. Install `rt`:
 ```bash
-cd relational-transformer
+cd relational_transformer
 pixi install
 ```
 
