@@ -6,7 +6,7 @@
 
 2. Clone the repository:
 ```bash
-git clone https://github.com/ValterH/relational-transformer
+git clone https://github.com/snap-stanford/relational_transformer
 ```
 
 3. Install `rt`:
