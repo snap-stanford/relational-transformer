@@ -65,7 +65,7 @@ python -m rt.emb rel-f1 --task True  # to embed text from task tables
 
 ## Experiments
 
-Pretraining
+Pretraining (takes about 5 hours on 8xH100 GPUs, reducing `max_steps` can reduce this runtime):
 ```bash
 torchrun --standalone --nproc_per_node=8 -m rt.main \
     --pairs='[("rel-hm", "user-churn"), ("rel-stack", "user-badge"), ("rel-stack", "user-engagement"), ("rel-avito", "user-visits"), ("rel-avito", "user-clicks"), ("rel-event", "user-ignore"), ("rel-trial", "study-outcome"), ("rel-f1", "driver-dnf"), ("rel-event", "user-repeat"), ("rel-f1", "driver-top3"), ("rel-hm", "item-sales"), ("rel-stack", "post-votes"), ("rel-trial", "site-success"), ("rel-trial", "study-adverse"), ("rel-event", "user-attendance"), ("rel-f1", "driver-position"), ("rel-avito", "ad-ctr")]' \
@@ -101,7 +101,7 @@ torchrun --standalone --nproc_per_node=8 -m rt.main \
     --compile_=True
 ```
 
-Finetuning
+Finetuning (takes about 1 hour on 8xH100 GPUs)
 ```bash
 torchrun --standalone --nproc_per_node=8 -m rt.main \
     --pairs='[("rel-amazon", "user-churn")]' \
