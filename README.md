@@ -69,7 +69,7 @@ Pretraining
 ```bash
 torchrun --standalone --nproc_per_node=8 -m rt.main \
     --pairs='[("rel-hm", "user-churn"), ("rel-stack", "user-badge"), ("rel-stack", "user-engagement"), ("rel-avito", "user-visits"), ("rel-avito", "user-clicks"), ("rel-event", "user-ignore"), ("rel-trial", "study-outcome"), ("rel-f1", "driver-dnf"), ("rel-event", "user-repeat"), ("rel-f1", "driver-top3"), ("rel-hm", "item-sales"), ("rel-stack", "post-votes"), ("rel-trial", "site-success"), ("rel-trial", "study-adverse"), ("rel-event", "user-attendance"), ("rel-f1", "driver-position"), ("rel-avito", "ad-ctr")]' \
-    --mask_prob=0.5 \
+    --mask_prob=0.0 \
     --zero_mask_prob_steps=50_000 \
     --mask_db_cells=False \
     --mask_task_cells=True \
