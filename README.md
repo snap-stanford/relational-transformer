@@ -7,23 +7,8 @@
 2. Clone the repository:
 ```bash
 git clone https://github.com/snap-stanford/relational_transformer
-```
-
-3. Install `rt`:
-```bash
-cd relational_transformer
-pixi install
-```
-
-4. Activate `rt` environment:
-```bash
-pixi shell
-```
-
-5. Install `rustler` (`rust` samp`ler`):
-```bash
-cd rustler
-maturin develop --uv --release
+cd relational_transformer/rustler
+pixi run maturin develop --uv --release
 ```
 
 ## Data:
@@ -32,9 +17,8 @@ maturin develop --uv --release
 1. Download the datasets and tasks from Relbench:
 ```bash
 cd .. # back to the root of the repository
-pixi shell
-python scripts/download_relbench_datasets.py
-python scripts/download_relbench_tasks.py
+pixi run python scripts/download_relbench_datasets.py
+pixi run python scripts/download_relbench_tasks.py
 ```
 
 2. Link the cache repository
@@ -45,18 +29,16 @@ ln -s ~/.cache/relbench ~/scratch/relbench
 
 3. Preprocessing (per database):
 ```bash
-pixi shell
 cd rustler
-cargo run --release -- pre rel-f1  # preprocesses both database and task tables
+pixi run cargo run --release -- pre rel-f1  # preprocesses both database and task tables
 ```
 
 4. Text embedding (per database):
 
 Find available sentence_transformers models [here](https://docs.google.com/spreadsheets/d/14QplCdTCDwEmTqrn1LH4yrbKvdogK4oQvYO1K1aPR5M/edit?gid=0#gid=0).
 ```bash
-pixi shell
-python -m rt.emb rel-f1 --task False  # to embed text from database tables
-python -m rt.emb rel-f1 --task True  # to embed text from task tables
+pixi run python -m rt.emb rel-f1 --task False  # to embed text from database tables
+pixi run python -m rt.emb rel-f1 --task True  # to embed text from task tables
 ```
 > [!NOTE]
 > Steps 3. and 4. should be run for all databases in order for experiments to work. \
@@ -67,7 +49,7 @@ python -m rt.emb rel-f1 --task True  # to embed text from task tables
 
 Pretraining (takes about 5 hours on 8xH100 GPUs, reducing `max_steps` can reduce this runtime):
 ```bash
-torchrun --standalone --nproc_per_node=8 -m rt.main \
+pixi run torchrun --standalone --nproc_per_node=8 -m rt.main \
     --pairs='[("rel-hm", "user-churn"), ("rel-stack", "user-badge"), ("rel-stack", "user-engagement"), ("rel-avito", "user-visits"), ("rel-avito", "user-clicks"), ("rel-event", "user-ignore"), ("rel-trial", "study-outcome"), ("rel-f1", "driver-dnf"), ("rel-event", "user-repeat"), ("rel-f1", "driver-top3"), ("rel-hm", "item-sales"), ("rel-stack", "post-votes"), ("rel-trial", "site-success"), ("rel-trial", "study-adverse"), ("rel-event", "user-attendance"), ("rel-f1", "driver-position"), ("rel-avito", "ad-ctr")]' \
     --mask_prob=0.0 \
     --zero_mask_prob_steps=50_000 \
@@ -103,7 +85,7 @@ torchrun --standalone --nproc_per_node=8 -m rt.main \
 
 Finetuning (takes about 1 hour on 8xH100 GPUs)
 ```bash
-torchrun --standalone --nproc_per_node=8 -m rt.main \
+pixi run torchrun --standalone --nproc_per_node=8 -m rt.main \
     --pairs='[("rel-amazon", "user-churn")]' \
     --mask_prob=0.0 \
     --zero_mask_prob_steps=0 \
