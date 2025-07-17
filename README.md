@@ -4,7 +4,7 @@
 
 1. Install pixi [https://pixi.sh/latest/#installation](https://pixi.sh/latest/#installation).
 
-2. Clone the repository:
+2. Clone and install the repository:
 ```bash
 git clone https://github.com/snap-stanford/relational_transformer
 cd relational_transformer/rustler
