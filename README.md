@@ -44,6 +44,10 @@ pixi run python -m rt.emb rel-f1 --task True  # to embed text from task tables
 > Steps 3. and 4. should be run for all databases in order for experiments to work. \
 > Relbench Databases: `rel-amazon`, `rel-avito`, `rel-event`, `rel-f1`, `rel-hm`, `rel-stack`, `rel-trial`
 
+5. Some more preprocessing (running once covers all datasets):
+```bash
+pixi run python -m rt.reg_std
+```
 
 ## Experiments
 
