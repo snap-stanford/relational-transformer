@@ -51,6 +51,15 @@ pixi run python -m rt.reg_std
 
 ## Experiments
 
+To set up wandb do:
+```bash
+pixi run wandb login
+```
+or:
+```bash
+pixi run wandb disabled
+```
+
 Pretraining (takes about 5 hours on 8xH100 GPUs, reducing `max_steps` can reduce this runtime):
 ```bash
 pixi run torchrun --standalone --nproc_per_node=8 -m rt.main \
