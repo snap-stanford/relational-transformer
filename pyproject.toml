@@ -22,19 +22,13 @@ maturin = { version = "*", extras = ["patchelf"] }
 ml_dtypes = "*"
 orjson = "*"
 ipykernel = "*"
-relbench = { version = "*", extras = ["full"] }
-pyg-lib = "*"
 scikit-learn = "<1.6.0"
 polars = "*"
 maturin_import_hook = "*"
-
-[tool.pixi.pypi-options]
-index-url = "https://pypi.org/simple"
-find-links = [{ url = "https://data.pyg.org/whl/torch-2.6.0+cu124.html" }]
+matplotlib = "*"
 
 [tool.pixi.dependencies]
 rust = "*"
 pygraphviz = "*"
 uv = "*"
 
-[tool.pixi.tasks]

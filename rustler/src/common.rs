@@ -1,6 +1,8 @@
 use rkyv::{Archive, Deserialize, Serialize};
 use serde::{Deserialize as SerdeDeserialize, Serialize as SerdeSerialize};
 
+// node represents a row in a table
+// TableInfo struct has the offset of the first node in the table and the number of nodes in the table
 #[derive(SerdeSerialize, SerdeDeserialize)]
 pub struct TableInfo {
     pub node_idx_offset: i32,
@@ -38,6 +40,7 @@ pub enum SemType {
     Number,
     Text,
     DateTime,
+    Boolean,
 }
 
 #[derive(Archive, Deserialize, Serialize, Default)]
@@ -54,6 +57,8 @@ pub struct Node {
     pub number_values: Vec<f32>,
     pub text_values: Vec<i32>,
     pub datetime_values: Vec<f32>,
+    pub boolean_values: Vec<f32>,
+    pub class_value_idx: Vec<i32>,
 }
 
 #[derive(Archive, Deserialize, Serialize, Default)]

@@ -17,6 +17,20 @@ use std::iter;
 use std::path::Path;
 use std::time::Instant;
 
+//Function to automatically binarize a column based on its first non-null value
+pub fn make_column_boolean(df: &mut DataFrame, col_name: &str) -> PolarsResult<()> {
+    let s_str = df.column(col_name)?.cast(&DataType::String)?;
+    let ca = s_str.str()?;
+    let first = ca
+        .get(0)
+        .ok_or_else(|| PolarsError::NoData("column is empty".into()))?;
+
+    let mut mask_series = ca.equal(first).into_series();
+    mask_series.rename(col_name.into());
+    df.replace(col_name, mask_series)?;
+    Ok(())
+}
+
 const PBAR_TEMPLATE: &str = "{percent}% {bar} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}<{eta_precise}, {decimal_bytes_per_sec}]";
 
 #[derive(Debug, Clone)]
@@ -39,23 +53,29 @@ struct Table {
 #[derive(Parser)]
 pub struct Cli {
     #[arg(default_value = "rel-f1")]
-    dataset_name: String,
+    db_name: String,
     #[arg(long, default_value_t = false)]
     skip_db: bool,
 }
 
+fn cast_col_to_bool(df: DataFrame, col_name: &str) -> Result<DataFrame, PolarsError> {
+    df.lazy()
+        .with_column(col(col_name).cast(DataType::Boolean).alias(col_name))
+        .collect()
+}
+
 pub fn main(cli: Cli) {
-    let dataset_path = format!(
-        "{}/scratch/relbench/{}",
-        var("HOME").unwrap(),
-        cli.dataset_name
-    );
+    let dataset_path = format!("{}/scratch/relbench/{}", var("HOME").unwrap(), cli.db_name);
+
+    let dashes = dataset_path.matches("-").count();
+    dbg!(dashes);
 
     println!("reading tables...");
     let tic = Instant::now();
     let mut table_map = HashMap::with_hasher(BuildHasherDefault::<DefaultHasher>::new());
     let mut num_rows_sum = 0;
     let mut num_cells_sum = 0;
+
     for (is_db_table, pq_path) in itertools::chain(
         iter::repeat(true).zip(
             glob(&format!("{}/db/*.parquet", dataset_path))
@@ -70,9 +90,10 @@ pub fn main(cli: Cli) {
                 .sorted(),
         ),
     ) {
-        if pq_path.to_str().unwrap().matches("-").count() == 3 {
+        if pq_path.to_str().unwrap().matches("-").count() == dashes + 2 {
             continue;
         }
+        dbg!(&pq_path);
 
         let mut file = fs::File::open(&pq_path).unwrap();
         let reader = ParquetReader::new(&mut file);
@@ -109,7 +130,7 @@ pub fn main(cli: Cli) {
                         Value::String(s) => s,
                         _ => panic!(),
                     };
-                    if cli.dataset_name == "rel-avito" {
+                    if cli.db_name == "rel-avito" {
                         if k == "UserID" {
                             v = "UserInfo".to_string();
                         } else if k == "AdID" {
@@ -153,30 +174,118 @@ pub fn main(cli: Cli) {
         };
         let table_key = (table_name.clone(), table_type.clone());
 
-        // dataset specific hacks
-        if table_name == "user-repeat" || table_name == "user-ignore" {
-            df = df.drop("index").unwrap();
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //Binarize columns based on first non-null value
+        if cli.db_name == "rel-stack" && table_name == "postLinks" {
+            make_column_boolean(&mut df, "LinkTypeId").unwrap();
         }
 
-        if cli.dataset_name == "rel-event" && table_name == "user_friends" {
-            df = df.drop_nulls::<String>(None).unwrap();
-            df = df.with_row_index("dummy".into(), None).unwrap();
+        // if cli.db_name == "rel-stack" && table_name == "badges" {
+        //     make_column_boolean(&mut df, "TagBased").unwrap();
+
+        // }
+        if cli.db_name == "rel-trial" && table_name == "studies" {
+            make_column_boolean(&mut df, "has_dmc").unwrap();
         }
-        if cli.dataset_name == "rel-event" && table_name == "event_attendees" {
-            df = df.drop_nulls::<String>(None).unwrap();
+        // // if cli.db_name == "rel-trial" && table_name == "designs" {
+        // //     make_column_boolean(&mut df, "allocation").unwrap();
+        // // }
+        // if cli.db_name == "rel-trial" && table_name == "studies" {
+        //     make_column_boolean(&mut df, "is_fda_regulated_device").unwrap();
+        // }
+
+        if cli.db_name == "rel-trial" && table_name == "eligibilities" {
+            for col in ["adult", "child", "older_adult"] {
+                make_column_boolean(&mut df, col).unwrap();
+            }
         }
 
-        if cli.dataset_name == "rel-amazon" && table_name == "product" {
-            df.apply("category", |c| {
-                c.list()
-                    .unwrap()
-                    .into_iter()
-                    // XXX: takes only the first element
-                    .map(|l| l.map(|l| l.iter().next().unwrap().to_string()))
-                    .collect::<StringChunked>()
-                    .into_column()
-            })
-            .unwrap();
+        // if cli.db_name == "rel-event" && table_name == "users" {
+        //     make_column_boolean(&mut df, "gender").unwrap();
+        // }
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        // amazon
+        if cli.db_name == "rel-amazon" {
+            if table_name == "user-churn" {
+                df = cast_col_to_bool(df, "churn").unwrap();
+            }
+            if table_name == "item-churn" {
+                df = cast_col_to_bool(df, "churn").unwrap();
+            }
+            if table_name == "product" {
+                df.apply("category", |c| {
+                    c.list()
+                        .unwrap()
+                        .into_iter()
+                        // XXX: takes only the first element
+                        .map(|l| l.map(|l| l.iter().next().unwrap().to_string()))
+                        .collect::<StringChunked>()
+                        .into_column()
+                })
+                .unwrap();
+            }
+        }
+
+        // stack
+        if cli.db_name == "rel-stack" {
+            if table_name == "user-engagement" {
+                df = cast_col_to_bool(df, "contribution").unwrap();
+            }
+            if table_name == "user-badge" {
+                df = cast_col_to_bool(df, "WillGetBadge").unwrap();
+            }
+            if table_name == "posts" {
+                df = df.drop("AcceptedAnswerId").unwrap();
+            }
+        }
+
+        // trial
+        if cli.db_name == "rel-trial" && table_name == "study-outcome" {
+            df = cast_col_to_bool(df, "outcome").unwrap();
+        }
+
+        // f1
+        if cli.db_name == "rel-f1" {
+            if table_name == "driver-dnf" {
+                df = cast_col_to_bool(df, "did_not_finish").unwrap();
+            }
+            if table_name == "driver-top3" {
+                df = cast_col_to_bool(df, "qualifying").unwrap();
+            }
+        }
+
+        // hm
+        if cli.db_name == "rel-hm" && table_name == "user-churn" {
+            df = cast_col_to_bool(df, "churn").unwrap();
+        }
+
+        // event
+        if cli.db_name == "rel-event" {
+            if table_name == "event_attendees" {
+                df = df.drop_nulls::<String>(None).unwrap();
+            }
+            if table_name == "user_friends" {
+                df = df.drop_nulls::<String>(None).unwrap();
+                df = df.with_row_index("dummy".into(), None).unwrap();
+            }
+            if table_name == "user-repeat"
+                || table_name == "user-ignore"
+                || table_name == "user-attendance"
+            {
+                df = df.drop("index").unwrap();
+                df = cast_col_to_bool(df, "target").unwrap();
+            }
+        }
+
+        // avito
+        if cli.db_name == "rel-avito" {
+            if table_name == "user-visits" {
+                df = cast_col_to_bool(df, "num_click").unwrap();
+            }
+            if table_name == "user-clicks" {
+                df = cast_col_to_bool(df, "num_click").unwrap();
+            }
         }
 
         let num_rows = df.height() as i32;
@@ -198,25 +307,33 @@ pub fn main(cli: Cli) {
     }
     println!("done in {:?}.", tic.elapsed());
 
-    // TODO: cleanup
     println!("computing column stats...");
     let tic = Instant::now();
     let mut dt_cnt: usize = 0;
     let mut dt_sum: f64 = 0.0;
     let mut dt_sum_sq: f64 = 0.0;
+
     for table in table_map.values_mut() {
         for col in table.df.iter() {
             let col = col.rechunk();
             match col.dtype() {
-                DataType::Boolean
-                | DataType::UInt32
+                DataType::Boolean => {
+                    let col_float = col.cast(&DataType::Float64).unwrap().drop_nulls();
+                    let col_mean = col_float.mean().unwrap_or(0.0);
+                    let col_std = col_float.std(1).unwrap_or(0.0);
+
+                    table.col_stats.push(ColStat {
+                        mean: col_mean,
+                        std: col_std,
+                    });
+                }
+                DataType::UInt32
                 | DataType::Int32
                 | DataType::Int64
                 | DataType::Float64
                 | DataType::Float32 => {
                     let col = col.cast(&DataType::Float64).unwrap().drop_nulls();
                     let col = col.filter(&col.is_not_nan().unwrap()).unwrap();
-                    // TODO: flag and remove the column entirely
                     let mean = col.mean().unwrap_or(0.0);
                     let std = col.std(1).unwrap_or(1.0);
                     let std = if std == 0.0 { 1.0 } else { std };
@@ -224,10 +341,8 @@ pub fn main(cli: Cli) {
                 }
                 DataType::Datetime(u, _) => {
                     assert!(*u == TimeUnit::Nanoseconds);
-                    // TODO: refactor to avoid duplication with above
                     let col = col.cast(&DataType::Float64).unwrap().drop_nulls();
                     let col = col.filter(&col.is_not_nan().unwrap()).unwrap();
-                    // TODO: flag and remove the column entirely
                     dt_cnt += col.len();
                     dt_sum += col.sum::<f64>().unwrap();
                     dt_sum_sq += col
@@ -256,6 +371,7 @@ pub fn main(cli: Cli) {
             }
         }
     }
+
     let dt_mean = dt_sum / dt_cnt as f64;
     let dt_std = (dt_sum_sq / dt_cnt as f64 - dt_mean * dt_mean).sqrt();
     dbg!(dt_cnt);
@@ -288,16 +404,14 @@ pub fn main(cli: Cli) {
             .unwrap(),
     );
     let mut text_to_idx = HashMap::new();
-    let mut task_text_to_idx = HashMap::new();
+    let mut column_name_to_idx: Vec<(String, i32)> = Vec::new();
     let mut node_vec = (0..num_rows_sum)
         .map(|_| Node::default())
         .collect::<Vec<_>>();
-    let mut db_p2f_adj = Adj {
+    let mut p2f_adj = Adj {
         adj: vec![Vec::new(); num_rows_sum as usize],
     };
-    let mut task_p2f_adj = Adj {
-        adj: vec![Vec::new(); num_rows_sum as usize],
-    };
+
     for ((_table_name, table_type), table) in &table_map {
         if cli.skip_db && table_type == &TableType::Db {
             println!(
@@ -306,32 +420,21 @@ pub fn main(cli: Cli) {
             );
             continue;
         }
-        let table_name_idx = if table_type == &TableType::Db {
-            let l = text_to_idx.len() as i32;
-            *text_to_idx
-                .entry(table.table_name.clone())
-                .or_insert_with(|| l)
-        } else {
-            let l = task_text_to_idx.len() as i32;
-            *task_text_to_idx
-                .entry(table.table_name.clone())
-                .or_insert_with(|| l)
-        };
+
+        let l = text_to_idx.len() as i32;
+        let table_name_idx = *text_to_idx
+            .entry(table.table_name.clone())
+            .or_insert_with(|| l);
 
         for (col, col_stat) in table.df.iter().zip(&table.col_stats) {
             let col = col.rechunk();
 
-            let col_name_idx = if table_type == &TableType::Db {
-                let l = text_to_idx.len() as i32;
-                *text_to_idx
-                    .entry(col.name().to_string())
-                    .or_insert_with(|| l)
-            } else {
-                let l = task_text_to_idx.len() as i32;
-                *task_text_to_idx
-                    .entry(col.name().to_string())
-                    .or_insert_with(|| l)
-            };
+            let col_name = format!("{} of {}", col.name(), table.table_name.clone());
+            let l = text_to_idx.len() as i32;
+            let col_name_idx = *text_to_idx.entry(col_name.clone()).or_insert_with(|| {
+                column_name_to_idx.push((col_name.clone(), l));
+                l
+            });
 
             if col.name() == table.pcol_name.as_deref().unwrap_or("") {
                 pbar.inc(col.len() as u64);
@@ -362,11 +465,7 @@ pub fn main(cli: Cli) {
 
                     let node_idx = table.node_idx_offset + r as i32;
                     let node = node_vec.get_mut(node_idx as usize).unwrap();
-                    if table_type != &TableType::Db {
-                        node.is_task_node = true;
-                    } else {
-                        node.is_task_node = false;
-                    }
+                    node.is_task_node = table_type != &TableType::Db;
                     node.node_idx = node_idx;
                     node.table_name_idx = table_name_idx;
 
@@ -427,11 +526,7 @@ pub fn main(cli: Cli) {
                         table_type: table_type.clone(),
                         timestamp,
                     };
-                    if table_type == &TableType::Db {
-                        db_p2f_adj.adj[pnode_idx as usize].push(p2f_edge);
-                    } else {
-                        task_p2f_adj.adj[pnode_idx as usize].push(p2f_edge);
-                    }
+                    p2f_adj.adj[pnode_idx as usize].push(p2f_edge)
                 }
 
                 continue;
@@ -441,15 +536,12 @@ pub fn main(cli: Cli) {
                 pbar.inc(1);
                 let node_idx = table.node_idx_offset + r as i32;
                 let node = &mut node_vec[node_idx as usize];
-                if table_type != &TableType::Db {
-                    node.is_task_node = true;
-                } else {
-                    node.is_task_node = false;
-                }
+                node.is_task_node = table_type != &TableType::Db;
                 node.node_idx = node_idx;
                 node.table_name_idx = table_name_idx;
+
                 let val = match val {
-                    AnyValue::Boolean(val) => AnyValue::Float64(val as i32 as f64),
+                    AnyValue::Boolean(val) => AnyValue::Boolean(val),
                     AnyValue::UInt32(val) => AnyValue::Float64(val as f64),
                     AnyValue::Int32(val) => AnyValue::Float64(val as f64),
                     AnyValue::Int64(val) => AnyValue::Float64(val as f64),
@@ -458,6 +550,18 @@ pub fn main(cli: Cli) {
                 };
                 match val {
                     AnyValue::Null => {}
+                    AnyValue::Boolean(val) => {
+                        let val_float = if val { 1.0 } else { 0.0 };
+                        let val_float = (val_float - col_stat.mean) / col_stat.std;
+                        // println!("Column {}: boolean val: {} mean: {} std: {}", col.name(), val_float, col_stat.mean, col_stat.std);
+                        node.boolean_values.push(val_float as f32);
+                        node.number_values.push(0.0);
+                        node.text_values.push(0);
+                        node.datetime_values.push(0.0);
+                        node.sem_types.push(SemType::Boolean);
+                        node.col_name_idxs.push(col_name_idx);
+                        node.class_value_idx.push(-1);
+                    }
                     AnyValue::Float64(val) => {
                         if val.is_nan() {
                             continue;
@@ -469,34 +573,35 @@ pub fn main(cli: Cli) {
                             dbg!(col_stat);
                             panic!();
                         }
+                        node.boolean_values.push(0.0);
                         node.number_values.push(val as f32);
                         node.text_values.push(0);
                         node.datetime_values.push(0.0);
                         node.sem_types.push(SemType::Number);
                         node.col_name_idxs.push(col_name_idx);
+                        node.class_value_idx.push(-1);
                     }
                     AnyValue::Datetime(val, unit, _) => {
                         assert!(unit == TimeUnit::Nanoseconds);
                         let val = (val as f64 - dt_mean) / dt_std;
+                        node.boolean_values.push(0.0);
                         node.number_values.push(0.0);
                         node.text_values.push(0);
                         node.datetime_values.push(val as f32);
                         node.sem_types.push(SemType::DateTime);
                         node.col_name_idxs.push(col_name_idx);
+                        node.class_value_idx.push(-1);
                     }
                     AnyValue::String(val) => {
-                        let text_idx = if table_type == &TableType::Db {
-                            let l = text_to_idx.len() as i32;
-                            *text_to_idx.entry(val.to_string()).or_insert_with(|| l)
-                        } else {
-                            let l = task_text_to_idx.len() as i32;
-                            *task_text_to_idx.entry(val.to_string()).or_insert_with(|| l)
-                        };
+                        let l = text_to_idx.len() as i32;
+                        let text_idx = *text_to_idx.entry(val.to_string()).or_insert_with(|| l);
+                        node.boolean_values.push(0.0);
                         node.number_values.push(0.0);
                         node.text_values.push(text_idx);
                         node.datetime_values.push(0.0);
                         node.sem_types.push(SemType::Text);
                         node.col_name_idxs.push(col_name_idx);
+                        node.class_value_idx.push(text_idx);
                     }
                     _ => {
                         dbg!(&table.table_name);
@@ -511,128 +616,84 @@ pub fn main(cli: Cli) {
     pbar.finish();
     println!("done in {:?}.", tic.elapsed());
 
-    let pre_path = format!("{}/scratch/pre/{}", var("HOME").unwrap(), cli.dataset_name);
+    let pre_path = format!("{}/scratch/pre/{}", var("HOME").unwrap(), cli.db_name);
     fs::create_dir_all(Path::new(&pre_path)).unwrap();
 
     println!("writing out text...");
     let tic = Instant::now();
-    if !cli.skip_db {
-        let mut text_vec = vec![String::new(); text_to_idx.len()];
-        for (k, v) in text_to_idx {
-            text_vec[v as usize] = k;
-        }
-        let file = fs::File::create(format!("{}/db_text.json", pre_path)).unwrap();
-        let mut writer = BufWriter::new(file);
-        serde_json::to_writer(&mut writer, &text_vec).unwrap();
+    let mut text_vec = vec![String::new(); text_to_idx.len()];
+    for (k, v) in text_to_idx {
+        text_vec[v as usize] = k;
     }
-    let mut task_text_vec = vec![String::new(); task_text_to_idx.len()];
-    for (k, v) in task_text_to_idx {
-        task_text_vec[v as usize] = k;
+    let file = fs::File::create(format!("{}/text.json", pre_path)).unwrap();
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer(&mut writer, &text_vec).unwrap();
+
+    // Also produce a reverse mapping for text strings
+    let mut text_map: HashMap<String, i32> = HashMap::new();
+    for (idx, s) in text_vec.iter().enumerate() {
+        text_map.insert(s.clone(), idx as i32);
     }
-    let file = fs::File::create(format!("{}/task_text.json", pre_path)).unwrap();
-    let mut task_writer = BufWriter::new(file);
-    serde_json::to_writer(&mut task_writer, &task_text_vec).unwrap();
+    let file = fs::File::create(format!("{}/text_map.json", pre_path)).unwrap();
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer(&mut writer, &text_map).unwrap();
+
+    // Write column name to index mapping collected during node processing
+    let column_index: HashMap<String, i32> = column_name_to_idx.into_iter().collect();
+    let file = fs::File::create(format!("{}/column_index.json", pre_path)).unwrap();
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer(&mut writer, &column_index).unwrap();
     println!("done in {:?}.", tic.elapsed());
 
     println!("writing out table info...");
     let tic = Instant::now();
     let mut table_info_map = HashMap::new();
-    let mut task_table_info_map = HashMap::new();
     for (table_key, table) in &table_map {
         let key = format!("{}:{:?}", table_key.0, table_key.1);
-        if table_key.1 == TableType::Db {
-            table_info_map.insert(
-                key,
-                TableInfo {
-                    node_idx_offset: table.node_idx_offset,
-                    num_nodes: table.df.height() as i32,
-                },
-            );
-        } else {
-            task_table_info_map.insert(
-                key,
-                TableInfo {
-                    node_idx_offset: table.node_idx_offset,
-                    num_nodes: table.df.height() as i32,
-                },
-            );
-        }
+        table_info_map.insert(
+            key,
+            TableInfo {
+                node_idx_offset: table.node_idx_offset,
+                num_nodes: table.df.height() as i32,
+            },
+        );
     }
-    if !cli.skip_db {
-        let file = fs::File::create(format!("{}/db_table_info.json", pre_path)).unwrap();
-        let mut writer = BufWriter::new(file);
-        serde_json::to_writer(&mut writer, &table_info_map).unwrap();
-    }
-    let file = fs::File::create(format!("{}/task_table_info.json", pre_path)).unwrap();
+
+    let file = fs::File::create(format!("{}/table_info.json", pre_path)).unwrap();
     let mut writer = BufWriter::new(file);
-    serde_json::to_writer(&mut writer, &task_table_info_map).unwrap();
+    serde_json::to_writer(&mut writer, &table_info_map).unwrap();
     println!("done in {:?}.", tic.elapsed());
 
-    println!("writing out nodes...");
     let tic = Instant::now();
     let mut offsets = vec![0];
-    let mut task_offsets = vec![0];
     let pbar = ProgressBar::new(node_vec.len() as u64).with_style(
         ProgressStyle::default_bar()
             .template(PBAR_TEMPLATE)
             .unwrap(),
     );
-    if !cli.skip_db {
-        let file = fs::File::create(format!("{}/db_nodes.rkyv", pre_path)).unwrap();
-        let mut writer = BufWriter::new(file);
-        let file = fs::File::create(format!("{}/task_nodes.rkyv", pre_path)).unwrap();
-        let mut task_writer = BufWriter::new(file);
-        for node in node_vec {
-            let bytes = rkyv::to_bytes::<Error>(&node).unwrap();
-            if node.is_task_node {
-                task_writer.write_all(&bytes).unwrap();
-                task_offsets.push(task_writer.stream_position().unwrap() as i64);
-            } else {
-                writer.write_all(&bytes).unwrap();
-                offsets.push(writer.stream_position().unwrap() as i64);
-            }
-            pbar.inc(1);
-        }
-    } else {
-        // let file = fs::File::create(format!("{}/db_nodes.rkyv", pre_path)).unwrap();
-        // let mut writer = BufWriter::new(file);
-        let file = fs::File::create(format!("{}/task_nodes.rkyv", pre_path)).unwrap();
-        let mut task_writer = BufWriter::new(file);
-        for node in node_vec {
-            let bytes = rkyv::to_bytes::<Error>(&node).unwrap();
-            if node.is_task_node {
-                task_writer.write_all(&bytes).unwrap();
-                task_offsets.push(task_writer.stream_position().unwrap() as i64);
-            } else {
-                // writer.write_all(&bytes).unwrap();
-                offsets.push(writer.stream_position().unwrap() as i64);
-            }
-            pbar.inc(1);
-        }
+
+    println!("writing out nodes...");
+    let file = fs::File::create(format!("{}/nodes.rkyv", pre_path)).unwrap();
+    let mut writer = BufWriter::new(file);
+    for node in node_vec {
+        let bytes = rkyv::to_bytes::<Error>(&node).unwrap();
+        writer.write_all(&bytes).unwrap();
+        offsets.push(writer.stream_position().unwrap() as i64);
+        pbar.inc(1);
     }
     pbar.finish();
-    if !cli.skip_db {
-        let file = fs::File::create(format!("{}/db_offsets.rkyv", pre_path)).unwrap();
-        let mut writer = BufWriter::new(file);
-        let bytes = rkyv::to_bytes::<Error>(&Offsets { offsets }).unwrap();
-        writer.write_all(&bytes).unwrap();
-    }
-    let file = fs::File::create(format!("{}/task_offsets.rkyv", pre_path)).unwrap();
-    let mut task_writer = BufWriter::new(file);
-    let bytes = rkyv::to_bytes::<Error>(&Offsets {
-        offsets: task_offsets,
-    })
-    .unwrap();
-    task_writer.write_all(&bytes).unwrap();
-    if !cli.skip_db {
-        let file = fs::File::create(format!("{}/db_p2f_adj.rkyv", pre_path)).unwrap();
-        let mut writer = BufWriter::new(file);
-        let bytes = rkyv::to_bytes::<Error>(&db_p2f_adj).unwrap();
-        writer.write_all(&bytes).unwrap();
-    }
-    let file = fs::File::create(format!("{}/task_p2f_adj.rkyv", pre_path)).unwrap();
-    let mut task_writer = BufWriter::new(file);
-    let bytes = rkyv::to_bytes::<Error>(&task_p2f_adj).unwrap();
-    task_writer.write_all(&bytes).unwrap();
+
+    println!("writing out offsets...");
+    let file = fs::File::create(format!("{}/offsets.rkyv", pre_path)).unwrap();
+    let mut writer = BufWriter::new(file);
+    let bytes = rkyv::to_bytes::<Error>(&Offsets { offsets }).unwrap();
+    writer.write_all(&bytes).unwrap();
+
+    println!("writing out p2f_adj...");
+    let file = fs::File::create(format!("{}/p2f_adj.rkyv", pre_path)).unwrap();
+    let mut writer = BufWriter::new(file);
+    let bytes = rkyv::to_bytes::<Error>(&p2f_adj).unwrap();
+    writer.write_all(&bytes).unwrap();
+
     println!("done in {:?}.", tic.elapsed());
 }

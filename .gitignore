@@ -1,13 +1,6 @@
 __pycache__
 .ipynb_checkpoints
-
-# pixi environments
 .pixi
 *.egg-info
-
-# artifacts
-/ckpt
 /wandb
-
-# developement
 .vscode

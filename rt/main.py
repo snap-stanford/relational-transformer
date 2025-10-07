@@ -1,33 +1,21 @@
-import maturin_import_hook
-from maturin_import_hook.settings import MaturinSettings
-
-maturin_import_hook.install(settings=MaturinSettings(release=True, uv=True))
-
 import os
-import json
-
-os.environ["TORCHINDUCTOR_FX_GRAPH_CACHE"] = "1"
-os.environ["TORCHINDUCTOR_AUTOGRAD_CACHE"] = "1"
-
+import random
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.distributed as dist
-from torch.nn.utils import get_total_norm, clip_grads_with_norm_
 import wandb
-from sklearn.metrics import roc_auc_score, r2_score
+from sklearn.metrics import r2_score, roc_auc_score
 from torch import optim
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.nn.utils import clip_grads_with_norm_, get_total_norm
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
-from rt.data import FineTuneDataset
-from rt.model import Transformer
-
-import os
-import random
-import numpy as np
+from rt.data import RelationalDataset
+from rt.model import RelationalTransformer
 
 
 def seed_everything(seed=42):
@@ -41,74 +29,78 @@ def seed_everything(seed=42):
     # torch.backends.cudnn.benchmark = False
 
 
-# TODO: add type hints and make sure that strictfire validates them
+def all_gather_nd(tensor: torch.Tensor) -> list[torch.Tensor]:
+    """
+    Gathers tensor arrays of different lengths in a list.
+    The length dimension is 0. This supports any number of extra dimensions in the tensors.
+    All the other dimensions should be equal between the tensors.
+    Adapted from: https://stackoverflow.com/a/71433508
+
+    Args:
+        tensor (Tensor): Tensor to be broadcast from current process.
+
+    Returns:
+        list[Tensor]: List of tensors gathered from all processes.
+    """
+    world_size = dist.get_world_size()
+    local_size = torch.tensor(tensor.size(), device=tensor.device)
+    all_sizes = [torch.zeros_like(local_size) for _ in range(world_size)]
+    dist.all_gather(all_sizes, local_size)
+
+    max_length = max(size[0] for size in all_sizes)
+
+    length_diff = max_length.item() - local_size[0].item()
+    if length_diff:
+        pad_size = (length_diff, *tensor.size()[1:])
+        padding = torch.zeros(pad_size, device=tensor.device, dtype=tensor.dtype)
+        tensor = torch.cat((tensor, padding))
+
+    all_tensors_padded = [torch.zeros_like(tensor) for _ in range(world_size)]
+    dist.all_gather(all_tensors_padded, tensor)
+    all_tensors = []
+    for tensor_, size in zip(all_tensors_padded, all_sizes):
+        all_tensors.append(tensor_[: size[0]])
+    return all_tensors
+
+
 def main(
-    # data
-    pairs=[
-        # clf
-        # ("rel-amazon", "user-churn"),
-        # ("rel-hm", "user-churn"),
-        # ("rel-stack", "user-badge"),
-        # ("rel-amazon", "item-churn"),
-        # ("rel-stack", "user-engagement"),
-        # ("rel-avito", "user-visits"),
-        # ("rel-avito", "user-clicks"),
-        # ("rel-event", "user-ignore"),
-        # ("rel-trial", "study-outcome"),
-        ("rel-f1", "driver-dnf"),
-        # ("rel-event", "user-repeat"),
-        # ("rel-f1", "driver-top3"),
-        # reg
-        # ("rel-hm", "item-sales"),
-        # ("rel-amazon", "user-ltv"),
-        # ("rel-amazon", "item-ltv"),
-        # ("rel-stack", "post-votes"),
-        # ("rel-trial", "site-success"),
-        # ("rel-trial", "study-adverse"),
-        # ("rel-event", "user-attendance"),
-        # ("rel-f1", "driver-position"),
-        # ("rel-avito", "ad-ctr"),
-    ],
-    mask_prob=0.5,
-    zero_mask_prob_steps=100,
-    mask_db_cells=False,
-    mask_task_cells=True,
-    fake_names=False,
-    batch_size=32,
-    num_workers=8,
-    subsample_p2f_edges=256,
-    isolate_task_tables=False,
     # misc
-    date="2025-07-01_dev",
-    profile=False,
-    eval_splits=[],
-    eval_freq=None,
-    log_eval=False,
-    ckpt_freq=None,
-    load_ckpt_path=None,
-    save_ckpt_dir=None,
+    project,
+    eval_splits,
+    eval_freq,
+    eval_pow2,
+    max_eval_steps,
+    load_ckpt_path,
+    save_ckpt_dir,
+    compile_,
+    seed,
+    # data
+    train_tasks,
+    eval_tasks,
+    batch_size,
+    num_workers,
+    subsample_p2f_edges,
     # optimization
-    lr=1e-3,
-    lr_schedule=True,
-    max_grad_norm=1.0,
-    max_steps=1_001,
+    lr,
+    wd,
+    lr_schedule,
+    max_grad_norm,
+    max_steps,
     # model
-    embedding_model="stsb-distilroberta-base-v2",
-    d_text=768,
-    seq_len=1024,
-    num_layers=12,
-    d_model=256,
-    num_heads=8,
-    d_ff=1024,
-    loss="huber",
-    compile_=True,
-    seed=0,
+    embedding_model,
+    d_text,
+    seq_len,
+    num_blocks,
+    d_model,
+    num_heads,
+    d_ff,
 ):
     seed_everything(seed)
 
     ddp = "LOCAL_RANK" in os.environ
     device = "cuda"
     if ddp:
+        os.environ["OMP_NUM_THREADS"] = f"{num_workers}"
         torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
         dist.init_process_group("nccl")
     if ddp:
@@ -119,32 +111,27 @@ def main(
         world_size = 1
 
     if rank == 0:
-        run = wandb.init(project=date, config=locals())
+        run = wandb.init(project=project, config=locals())
         print(run.name)
 
-    # torch.autograd.set_detect_anomaly(True)
     torch.multiprocessing.set_sharing_strategy("file_system")
     torch._dynamo.config.cache_size_limit = 16
-    torch._dynamo.config.compiled_autograd = compile_
-    # torch._dynamo.config.optimize_ddp = "python_reducer"
+    torch._dynamo.config.compiled_autograd = compile_ if ddp else False
     torch._dynamo.config.optimize_ddp = True
     torch.set_num_threads(1)
 
-    dataset = FineTuneDataset(
-        tasks=[(dataset_name, task_name, "train") for dataset_name, task_name in pairs],
+    dataset = RelationalDataset(
+        tasks=[
+            (db_name, table_name, target_column, "train", columns_to_drop)
+            for db_name, table_name, target_column, columns_to_drop in train_tasks
+        ],
         batch_size=batch_size,
         seq_len=seq_len,
-        mask_prob=mask_prob,
         rank=rank,
         world_size=world_size,
-        fake_names=fake_names,
         subsample_p2f_edges=subsample_p2f_edges,
-        isolate_task_tables=isolate_task_tables,
-        cos_steps=max_steps - zero_mask_prob_steps,
         embedding_model=embedding_model,
         d_text=d_text,
-        mask_db_cells=mask_db_cells,
-        mask_task_cells=mask_task_cells,
         seed=seed,
     )
     loader = DataLoader(
@@ -153,49 +140,44 @@ def main(
         num_workers=num_workers,
         persistent_workers=False,
         pin_memory=True,
-        in_order=False,
+        in_order=True,
     )
 
     eval_loaders = {}
-    for dataset_name, task_name in pairs:
+    for db_name, table_name, target_column, columns_to_drop in eval_tasks:
         for split in eval_splits:
-            eval_dataset = FineTuneDataset(
-                tasks=[(dataset_name, task_name, split)],
+            eval_dataset = RelationalDataset(
+                tasks=[(db_name, table_name, target_column, split, columns_to_drop)],
                 batch_size=batch_size,
                 seq_len=seq_len,
-                mask_prob=0.0,
                 rank=rank,
                 world_size=world_size,
-                fake_names=fake_names,
                 subsample_p2f_edges=subsample_p2f_edges,
-                isolate_task_tables=isolate_task_tables,
-                cos_steps=0,
                 embedding_model=embedding_model,
                 d_text=d_text,
-                mask_db_cells=False,
-                mask_task_cells=True,
                 seed=0,
             )
-            eval_loaders[(dataset_name, task_name, split)] = DataLoader(
+            eval_dataset.sampler.shuffle_py(0)
+            eval_loaders[(db_name, table_name, split)] = DataLoader(
                 eval_dataset,
                 batch_size=None,
                 num_workers=num_workers,
                 persistent_workers=True,
                 pin_memory=True,
-                in_order=False,
+                in_order=True,
             )
 
     net = Transformer(
-        num_layers=num_layers,
+        num_blocks=num_blocks,
         d_model=d_model,
         d_text=d_text,
         num_heads=num_heads,
         d_ff=d_ff,
-        loss=loss,
     )
     if load_ckpt_path is not None:
         load_ckpt_path = Path(load_ckpt_path).expanduser()
-        net.load_state_dict(torch.load(load_ckpt_path, map_location="cpu"))
+        state_dict = torch.load(load_ckpt_path, map_location="cpu")
+        net.load_state_dict(state_dict)
 
     if rank == 0:
         param_count = sum(p.numel() for p in net.parameters())
@@ -203,15 +185,15 @@ def main(
 
     net = net.to(device)
     net = net.to(torch.bfloat16)
-    if ddp:
-        net = DDP(net)
-    net = torch.compile(
-        net,
-        # fullgraph=True,
-        # dynamic=False,
-        disable=not compile_,
+    opt = optim.AdamW(
+        net.parameters(),
+        lr=lr,
+        weight_decay=wd,
+        betas=(0.9, 0.999),
+        eps=1e-8,
+        fused=True,
     )
-    opt = optim.AdamW(net.parameters(), lr=lr, fused=True)
+
     if lr_schedule:
         lrs = optim.lr_scheduler.OneCycleLR(
             opt,
@@ -221,113 +203,194 @@ def main(
             anneal_strategy="linear",
         )
 
+    if ddp:
+        net = DDP(net)
+
+    net = torch.compile(net, dynamic=False, disable=not compile_)
+
     steps = 0
     if rank == 0:
         wandb.log({"epochs": 0}, step=steps)
 
-    with open(f"{os.environ['HOME']}/scratch/pre/reg_std.json") as f:
-        std_dict = json.load(f)
+    eval_loader_iters = {}
+    for k, eval_loader in eval_loaders.items():
+        eval_loader_iters[k] = iter(eval_loader)
 
-    def evaluate():
+    def evaluate(net):
+        metrics = dict()
         net.eval()
         with torch.inference_mode():
             for (
-                dataset_name,
-                task_name,
+                db_name,
+                table_name,
                 split,
-            ), eval_loader in eval_loaders.items():
+            ), eval_loader_iter in eval_loader_iters.items():
+                if table_name in [
+                    "item-sales",
+                    "user-ltv",
+                    "item-ltv",
+                    "post-votes",
+                    "site-success",
+                    "study-adverse",
+                    "user-attendance",
+                    "driver-position",
+                    "ad-ctr",
+                ]:
+                    task_type = "reg"
+                else:
+                    task_type = "clf"
+
                 preds = []
                 labels = []
                 losses = []
-                for batch in tqdm(eval_loader, desc=split, disable=rank != 0):
+                eval_load_times = []
+                eval_loader = eval_loaders[(db_name, table_name, split)]
+                pbar = tqdm(
+                    total=(
+                        min(max_eval_steps, len(eval_loader))
+                        if max_eval_steps > -1
+                        else len(eval_loader)
+                    ),
+                    desc=f"{db_name}/{table_name}/{split}",
+                    disable=rank != 0,
+                )
+
+                batch_idx = 0
+                while True:
+                    tic = time.time()
+                    try:
+                        batch = next(eval_loader_iter)
+                        batch_idx += 1
+                    except StopIteration:
+                        break
+                    toc = time.time()
+                    pbar.update(1)
+
+                    eval_load_time = toc - tic
+                    if rank == 0:
+                        eval_load_times.append(eval_load_time)
+
                     true_batch_size = batch.pop("true_batch_size")
                     for k in batch:
                         batch[k] = batch[k].to(device, non_blocking=True)
 
                     batch["masks"][true_batch_size:, :] = False
                     batch["is_targets"][true_batch_size:, :] = False
+                    batch["is_padding"][true_batch_size:, :] = True
 
-                    loss, yhat = net(batch)
+                    loss, yhat_dict = net(batch)
 
-                    yhat = yhat[batch["is_targets"], :]
-                    y = batch["number_values"][batch["is_targets"], :]
+                    if task_type == "clf":
+                        yhat = yhat_dict["boolean"][batch["is_targets"]]
+                        y = batch["boolean_values"][batch["is_targets"]].flatten()
+                    elif task_type == "reg":
+                        yhat = yhat_dict["number"][batch["is_targets"]]
+                        y = batch["number_values"][batch["is_targets"]].flatten()
+
                     assert yhat.size(0) == true_batch_size
                     assert y.size(0) == true_batch_size
 
-                    losses.append(loss)
-                    preds.append(yhat.squeeze(-1).tolist())
-                    labels.append(y.squeeze(-1).tolist())
+                    pred = yhat.flatten()
 
-                losses = [x.item() for x in losses]
-                preds = sum(preds, [])
-                labels = sum(labels, [])
+                    losses.append(loss.item())
+                    preds.append(pred)
+                    labels.append(y)
+
+                    if max_eval_steps > -1 and batch_idx >= max_eval_steps:
+                        break
+
+                eval_loader_iters[(db_name, table_name, split)] = iter(eval_loader)
+
+                pbar.close()
+                preds = torch.cat(preds, dim=0)
+                labels = torch.cat(labels, dim=0)
 
                 if ddp:
-                    labels_list = [None] * dist.get_world_size()
-                    dist.all_gather_object(labels_list, labels)
-
-                    preds_list = [None] * dist.get_world_size()
-                    dist.all_gather_object(preds_list, preds)
+                    # ensure the predictions and labels are gathered jointly
+                    preds = all_gather_nd(preds)
+                    labels = all_gather_nd(labels)
                 else:
-                    labels_list = [labels]
-                    preds_list = [preds]
+                    preds = [preds]
+                    labels = [labels]
 
                 if rank == 0:
                     loss = sum(losses) / len(losses)
-                    k = f"loss/{dataset_name}/{task_name}/{split}"
-                    wandb.log({k: loss}, step=steps)
+                    k = f"loss/{db_name}/{table_name}/{split}"
+                    avg_eval_load_time = sum(eval_load_times) / len(eval_load_times)
+                    wandb.log(
+                        {
+                            k: loss,
+                            f"avg_eval_load_time/{db_name}/{table_name}": avg_eval_load_time,
+                        },
+                        step=steps,
+                    )
 
-                    labels = sum(labels_list, [])
-                    preds = sum(preds_list, [])
-                    if task_name in [
-                        "item-sales",
-                        "user-ltv",
-                        "item-ltv",
-                        "post-votes",
-                        "site-success",
-                        "study-adverse",
-                        "user-attendance",
-                        "driver-position",
-                        "ad-ctr",
-                    ]:
-                        # metric_name = "mae"
-                        # std = std_dict[f"{dataset_name}/{task_name}"]
-                        # metric = mean_absolute_error(labels, preds) * std
+                    preds = torch.cat(preds, dim=0).float().cpu().numpy()
+                    labels = torch.cat(labels, dim=0).float().cpu().numpy()
+
+                    if task_type == "reg":
                         metric_name = "r2"
                         metric = r2_score(labels, preds)
-                    else:
+                    elif task_type == "clf":
                         metric_name = "auc"
-                        labels = [int(x) for x in labels]
+                        labels = [int(x > 0) for x in labels]
                         metric = roc_auc_score(labels, preds)
-                    k = f"{metric_name}/{dataset_name}/{task_name}/{split}"
-                    wandb.log({k: metric}, step=steps)
-                    print(f"step={steps}, \t{k}: {metric}")
 
-    def checkpoint():
+                    k = f"{metric_name}/{db_name}/{table_name}/{split}"
+                    wandb.log({k: metric}, step=steps)
+                    print(f"\nstep={steps}, \t{k}: {metric}")
+                    metrics[(db_name, table_name, split)] = metric
+
+        return metrics
+
+    def checkpoint(best=False, db_name="", table_name="", split=""):
         if rank != 0:
             return
         save_ckpt_dir_ = Path(save_ckpt_dir).expanduser()
         save_ckpt_dir_.mkdir(parents=True, exist_ok=True)
-        save_ckpt_path = f"{save_ckpt_dir_}/{steps=}.pt"
-        state_dict = net.module.state_dict() if ddp else net.state_dict()
-        torch.save(state_dict, save_ckpt_path)
-        print(f"saved checkpoint to {save_ckpt_path}")
+        if best:
+            save_ckpt_path = f"{save_ckpt_dir_}/{db_name}_{table_name}_{split}_best.pt"
+            state_dict = net.module.state_dict() if ddp else net.state_dict()
+            torch.save(state_dict, save_ckpt_path)
+            print(f"saved best checkpoint to {save_ckpt_path}")
+        else:
+            save_ckpt_path = f"{save_ckpt_dir_}/{steps=}.pt"
+            state_dict = net.module.state_dict() if ddp else net.state_dict()
+            torch.save(state_dict, save_ckpt_path)
+            print(f"saved checkpoint to {save_ckpt_path}")
 
     pbar = tqdm(
         total=max_steps,
         desc="steps",
         disable=rank != 0,
     )
+
+    best_metrics = dict()
+
     while steps < max_steps:
         loader.dataset.sampler.shuffle_py(int(steps / len(loader)))
         loader_iter = iter(loader)
         while steps < max_steps:
-            if eval_freq is not None and steps % eval_freq == 0:
-                evaluate()
-            if log_eval and steps & (steps - 1) == 0:
-                evaluate()
-            if ckpt_freq is not None and steps % ckpt_freq == 0:
-                checkpoint()
+            if (eval_freq is not None and steps % eval_freq == 0) or (
+                eval_pow2 and steps & (steps - 1) == 0
+            ):
+                metrics = evaluate(net)
+                if save_ckpt_dir is not None:
+                    for (db_name, table_name, split), metric in metrics.items():
+                        # Eval metric is always higher is better (auc, r2)
+                        best_metric = best_metrics.get(
+                            (db_name, table_name, split), -float("inf")
+                        )
+                        if metric > best_metric:
+                            best_metrics[(db_name, table_name, split)] = metric
+                            checkpoint(
+                                best=True,
+                                db_name=db_name,
+                                table_name=table_name,
+                                split=split,
+                            )
+                        else:
+                            checkpoint()
 
             net.train()
 
@@ -344,7 +407,7 @@ def main(
             if rank == 0:
                 wandb.log({"load_time": load_time}, step=steps)
 
-            loss, _yhat = net(batch)
+            loss, _yhat_dict = net(batch)
             opt.zero_grad(set_to_none=True)
             loss.backward()
 
@@ -364,35 +427,17 @@ def main(
             if ddp:
                 dist.all_reduce(loss, op=dist.ReduceOp.AVG)
             if rank == 0:
-                # TODO: calculate auc of the batch
-                # (maybe only once in a while if it hurts training throughput)
                 wandb.log(
                     {
                         "loss": loss,
                         "lr": opt.param_groups[0]["lr"],
-                        "mask_frac": batch["masks"].float().mean(),
                         "epochs": steps / len(loader),
                         "grad_norm": grad_norm,
                     },
                     step=steps,
                 )
 
-            if profile and steps != 0:
-                prof.step()  # noqa FIXME
-
             pbar.update(1)
-
-            if profile and steps == 1:
-                prof = torch.profiler.profile(with_modules=True)
-                prof.__enter__()
-
-    if profile:
-        prof.__exit__(None, None, None)
-        if rank == 0:
-            prof.export_chrome_trace("trace.json")
-            print(
-                prof.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1)
-            )
 
     if ddp:
         dist.destroy_process_group()
