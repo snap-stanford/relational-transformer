@@ -17,7 +17,7 @@ if __name__ == "__main__":
         train_tasks=[
             t for t in all_tasks if t[0] == "rel-amazon" and t[1] != "user-churn"
         ],
-        eval_tasks=("rel-amazon", "user-churn", "churn", []),
+        eval_tasks=[("rel-amazon", "user-churn", "churn", [])],
         batch_size=32,
         num_workers=8,
         subsample_p2f_edges=256,

@@ -14,8 +14,8 @@ if __name__ == "__main__":
         compile_=True,
         seed=0,
         # data
-        train_tasks=("rel-amazon", "user-churn", "churn", []),
-        eval_tasks=("rel-amazon", "user-churn", "churn", []),
+        train_tasks=[("rel-amazon", "user-churn", "churn", [])],
+        eval_tasks=[("rel-amazon", "user-churn", "churn", [])],
         batch_size=32,
         num_workers=8,
         subsample_p2f_edges=256,
