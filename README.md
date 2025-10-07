@@ -50,6 +50,26 @@ pixi run python -m rt.embed rel-f1
 > Steps 3. and 4. should be run for all databases: \
 > `rel-amazon`, `rel-avito`, `rel-event`, `rel-f1`, `rel-hm`, `rel-stack`, `rel-trial`
 
+## Download Preprocessed Data
+This project’s preprocessed data is hosted at **`hvag976/relational-transformer`** on the Hugging Face Hub. You can directly use this data and skip the data preparation step.
+
+1. Install the CLI
+```bash
+pip install -U huggingface_hub
+```
+
+2. Create the destination
+```bash
+mkdir -p ~/scratch/pre
+```
+
+3. Download the repository contents into ~/scratch/pre
+```bash
+huggingface-cli download hvag976/relational-transformer \
+  --repo-type dataset \
+  --local-dir ~/scratch/pre \
+  --local-dir-use-symlinks False
+```  
 
 ## Experiments
 
