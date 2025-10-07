@@ -167,7 +167,7 @@ def main(
                 in_order=True,
             )
 
-    net = Transformer(
+    net = RelationalTransformer(
         num_blocks=num_blocks,
         d_model=d_model,
         d_text=d_text,
@@ -438,6 +438,16 @@ def main(
                 )
 
             pbar.update(1)
+
+    # Print best test metrics
+    if rank == 0:
+        print("\n" + "="*80)
+        print("Best test metrics:")
+        print("="*80)
+        for (db_name, table_name, split), metric in best_metrics.items():
+            if split == "test":
+                print(f"{db_name}/{table_name}/test: {metric:.4f}")
+        print("="*80 + "\n")
 
     if ddp:
         dist.destroy_process_group()

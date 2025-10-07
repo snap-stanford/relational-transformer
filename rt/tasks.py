@@ -29,7 +29,7 @@ forecast_reg_tasks = [
 
 autocomplete_clf_tasks = [
     ("rel-avito", "SearchInfo", "IsUserLoggedOn", []),
-    ("rel-stack", "postlinks", "linktypeid", []),
+    ("rel-stack", "postLinks", "LinkTypeId", []),
     ("rel-amazon", "review", "verified", []),
     ("rel-trial", "studies", "has_dmc", []),
     (

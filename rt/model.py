@@ -242,6 +242,8 @@ class RelationalTransformer(nn.Module):
 
             if not sem_type_mask.any():
                 if t in yhat_out:
+                    # still touch the param to avoid unused param error
+                    loss_out = loss_out + (yhat.sum() * 0.0)
                     yhat_out[t] = yhat
                 continue
 
