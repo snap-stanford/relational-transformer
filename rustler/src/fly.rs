@@ -413,53 +413,55 @@ impl Sampler {
             let mut db_p2f_ftr: Vec<i32> = Vec::new();
 
             for edge in p2f_edges.iter() {
+                if edge.table_type == ArchivedTableType::Db {
+                    db_p2f_ftr.push(edge.node_idx.into());
+                    continue;
+                }
                 // only include task-table edges if target node belongs to the task table
-                if edge.table_type != ArchivedTableType::Db
-                    && edge.table_name_idx != seed_node.table_name_idx
-                {
+                if edge.table_name_idx != seed_node.table_name_idx {
                     continue;
                 }
 
                 // temporal constraint
                 if edge.timestamp.is_some() && seed_node.timestamp.is_some() {
-                    if edge.timestamp > seed_node.timestamp {
-                        continue;
-                    }
-                    if edge.timestamp == seed_node.timestamp
-                        && edge.table_type != ArchivedTableType::Db
-                    {
+                    if edge.timestamp >= seed_node.timestamp {
                         continue;
                     }
                 }
 
-                if edge.table_type != ArchivedTableType::Db {
-                    if depth + 1 >= p2f_ftr.len() {
-                        for _i in p2f_ftr.len()..=depth + 1 {
-                            p2f_ftr.push(vec![]);
-                        }
-                    }
-                    p2f_ftr[depth + 1].push(edge.node_idx.into());
-                } else {
-                    db_p2f_ftr.push(edge.node_idx.into());
-                }
-            }
-
-            // subsample db edges and append to p2f_ftr[depth + 1]
-            let original = std::mem::take(&mut db_p2f_ftr);
-
-            let idxs = if original.len() > self.subsample_p2f_edges {
-                index::sample(&mut rng, original.len(), self.subsample_p2f_edges).into_vec()
-            } else {
-                (0..original.len()).collect::<Vec<_>>()
-            };
-
-            for idx in idxs.iter() {
                 if depth + 1 >= p2f_ftr.len() {
                     for _i in p2f_ftr.len()..=depth + 1 {
                         p2f_ftr.push(vec![]);
                     }
                 }
-                p2f_ftr[depth + 1].push(original[*idx]);
+                p2f_ftr[depth + 1].push(edge.node_idx.into());
+            }
+
+            // subsample db edges and append to p2f_ftr[depth + 1]
+            // let original = std::mem::take(&mut db_p2f_ftr);
+
+            let idxs = if db_p2f_ftr.len() > self.subsample_p2f_edges {
+                index::sample(&mut rng, db_p2f_ftr.len(), self.subsample_p2f_edges).into_vec()
+            } else {
+                (0..db_p2f_ftr.len()).collect::<Vec<_>>()
+            };
+
+            for idx in idxs.iter() {
+                let node_idx = db_p2f_ftr[*idx];
+                let db_node = get_node(dataset, node_idx);
+
+                if db_node.timestamp.is_some() && seed_node.timestamp.is_some() {
+                    if db_node.timestamp > seed_node.timestamp {
+                        continue;
+                    }
+                }
+
+                if depth + 1 >= p2f_ftr.len() {
+                    for _i in p2f_ftr.len()..=depth + 1 {
+                        p2f_ftr.push(vec![]);
+                    }
+                }
+                p2f_ftr[depth + 1].push(db_p2f_ftr[*idx]);
             }
 
             let num_cells = node.col_name_idxs.len();
@@ -498,10 +500,7 @@ impl Sampler {
 
                 slices.boolean_values[seq_i] = bf16::from_f32(node.boolean_values[cell_i].into());
 
-                let is_target = (s == SemType::Number as i32
-                    || s == SemType::Text as i32
-                    || s == SemType::Boolean as i32)
-                    && seed_node_idx == node.node_idx
+                let is_target = seed_node_idx == node.node_idx
                     && node.col_name_idxs[cell_i] == target_column;
                 slices.is_targets[seq_i] = is_target;
 

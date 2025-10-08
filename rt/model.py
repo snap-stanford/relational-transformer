@@ -80,7 +80,7 @@ class RelationalBlock(nn.Module):
         self.ffn = FFN(d_model, d_ff)
 
     def forward(self, x, block_masks):
-        for l in ["feat", "nbr", "col", "full"]:
+        for l in ["col", "feat", "nbr", "full"]:
             x = x + self.attns[l](self.norms[l](x), block_mask=block_masks[l])
         x = x + self.ffn(self.norms["ffn"](x))
         return x
