@@ -22,7 +22,7 @@ use std::io::{BufReader, Read};
 use std::str;
 use std::time::Instant;
 
-const MAX_F2P_NBR: usize = 5;
+const MAX_F2P_NBRS: usize = 5;
 
 struct Vecs {
     node_idxs: Vec<i32>,
@@ -66,7 +66,7 @@ impl Vecs {
         let l = batch_size * seq_len;
         Self {
             node_idxs: vec![-1; l],
-            f2p_nbr_idxs: vec![-1; l * MAX_F2P_NBR],
+            f2p_nbr_idxs: vec![-1; l * MAX_F2P_NBRS],
             table_name_idxs: vec![0; l],
             col_name_idxs: vec![0; l],
             class_value_idxs: vec![-1; l],
@@ -87,7 +87,7 @@ impl Vecs {
     fn chunks_exact_mut(&mut self, seq_len: usize, d_text: usize) -> impl Iterator<Item = Slices> {
         izip!(
             self.node_idxs.chunks_exact_mut(seq_len),
-            self.f2p_nbr_idxs.chunks_exact_mut(seq_len * MAX_F2P_NBR),
+            self.f2p_nbr_idxs.chunks_exact_mut(seq_len * MAX_F2P_NBRS),
             self.table_name_idxs.chunks_exact_mut(seq_len),
             self.col_name_idxs.chunks_exact_mut(seq_len),
             self.class_value_idxs.chunks_exact_mut(seq_len),
@@ -466,8 +466,10 @@ impl Sampler {
                     continue; // do not add this cell to the sequence
                 }
                 slices.node_idxs[seq_i] = node.node_idx.into();
+
+                assert!(node.f2p_nbr_idxs.len() <= MAX_F2P_NBRS);
                 for (j, f2p_nbr_idx) in node.f2p_nbr_idxs.iter().enumerate() {
-                    slices.f2p_nbr_idxs[seq_i * MAX_F2P_NBR + j] = f2p_nbr_idx.into();
+                    slices.f2p_nbr_idxs[seq_i * MAX_F2P_NBRS + j] = f2p_nbr_idx.into();
                 }
 
                 slices.table_name_idxs[seq_i] = node.table_name_idx.into();

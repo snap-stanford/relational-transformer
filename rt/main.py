@@ -217,7 +217,7 @@ def main(
         eval_loader_iters[k] = iter(eval_loader)
 
     def evaluate(net):
-        metrics = dict()
+        metrics = {"val": {}, "test": {}}
         net.eval()
         with torch.inference_mode():
             for (
@@ -339,25 +339,23 @@ def main(
                     k = f"{metric_name}/{db_name}/{table_name}/{split}"
                     wandb.log({k: metric}, step=steps)
                     print(f"\nstep={steps}, \t{k}: {metric}")
-                    metrics[(db_name, table_name, split)] = metric
+                    metrics[split][(db_name, table_name)] = metric
 
         return metrics
 
-    def checkpoint(best=False, db_name="", table_name="", split=""):
+    def checkpoint(best=False, db_name="", table_name=""):
         if rank != 0:
             return
         save_ckpt_dir_ = Path(save_ckpt_dir).expanduser()
         save_ckpt_dir_.mkdir(parents=True, exist_ok=True)
         if best:
-            save_ckpt_path = f"{save_ckpt_dir_}/{db_name}_{table_name}_{split}_best.pt"
-            state_dict = net.module.state_dict() if ddp else net.state_dict()
-            torch.save(state_dict, save_ckpt_path)
-            print(f"saved best checkpoint to {save_ckpt_path}")
+            save_ckpt_path = f"{save_ckpt_dir_}/{db_name}_{table_name}_best.pt"
         else:
             save_ckpt_path = f"{save_ckpt_dir_}/{steps=}.pt"
-            state_dict = net.module.state_dict() if ddp else net.state_dict()
-            torch.save(state_dict, save_ckpt_path)
-            print(f"saved checkpoint to {save_ckpt_path}")
+
+        state_dict = net.module.state_dict() if ddp else net.state_dict()
+        torch.save(state_dict, save_ckpt_path)
+        print(f"saved checkpoint to {save_ckpt_path}")
 
     pbar = tqdm(
         total=max_steps,
@@ -365,7 +363,8 @@ def main(
         disable=rank != 0,
     )
 
-    best_metrics = dict()
+    best_val_metrics = dict()
+    best_test_metrics = dict()
 
     while steps < max_steps:
         loader.dataset.sampler.shuffle_py(int(steps / len(loader)))
@@ -376,18 +375,18 @@ def main(
             ):
                 metrics = evaluate(net)
                 if save_ckpt_dir is not None:
-                    for (db_name, table_name, split), metric in metrics.items():
+                    for (db_name, table_name), metric in metrics["val"].items():
                         # Eval metric is always higher is better (auc, r2)
-                        best_metric = best_metrics.get(
-                            (db_name, table_name, split), -float("inf")
+                        best_metric = best_val_metrics.get(
+                            (db_name, table_name), -float("inf")
                         )
                         if metric > best_metric:
-                            best_metrics[(db_name, table_name, split)] = metric
+                            best_val_metrics[(db_name, table_name)] = metric
+                            best_test_metrics[(db_name, table_name)] = metrics["test"][(db_name, table_name)]
                             checkpoint(
                                 best=True,
                                 db_name=db_name,
-                                table_name=table_name,
-                                split=split,
+                                table_name=table_name
                             )
                         else:
                             checkpoint()
@@ -444,9 +443,8 @@ def main(
         print("\n" + "="*80)
         print("Best test metrics:")
         print("="*80)
-        for (db_name, table_name, split), metric in best_metrics.items():
-            if split == "test":
-                print(f"{db_name}/{table_name}/test: {metric:.4f}")
+        for (db_name, table_name), metric in best_test_metrics.items():
+            print(f"{db_name}/{table_name}/test: {metric:.4f}")
         print("="*80 + "\n")
 
     if ddp:
