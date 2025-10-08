@@ -1,5 +1,5 @@
 use crate::common::{
-    ArchivedAdj, ArchivedEdge, ArchivedNode, ArchivedOffsets, ArchivedTableType, Offsets, SemType,
+    ArchivedAdj, ArchivedEdge, ArchivedNode, ArchivedOffsets, ArchivedTableType, Offsets,
 };
 use clap::Parser;
 use half::bf16;
@@ -423,10 +423,8 @@ impl Sampler {
                 }
 
                 // temporal constraint
-                if edge.timestamp.is_some() && seed_node.timestamp.is_some() {
-                    if edge.timestamp >= seed_node.timestamp {
-                        continue;
-                    }
+                if edge.timestamp.is_some() && seed_node.timestamp.is_some() && edge.timestamp >= seed_node.timestamp {
+                    continue;
                 }
 
                 if depth + 1 >= p2f_ftr.len() {
@@ -436,9 +434,6 @@ impl Sampler {
                 }
                 p2f_ftr[depth + 1].push(edge.node_idx.into());
             }
-
-            // subsample db edges and append to p2f_ftr[depth + 1]
-            // let original = std::mem::take(&mut db_p2f_ftr);
 
             let idxs = if db_p2f_ftr.len() > self.subsample_p2f_edges {
                 index::sample(&mut rng, db_p2f_ftr.len(), self.subsample_p2f_edges).into_vec()
@@ -450,10 +445,8 @@ impl Sampler {
                 let node_idx = db_p2f_ftr[*idx];
                 let db_node = get_node(dataset, node_idx);
 
-                if db_node.timestamp.is_some() && seed_node.timestamp.is_some() {
-                    if db_node.timestamp > seed_node.timestamp {
-                        continue;
-                    }
+                if db_node.timestamp.is_some() && seed_node.timestamp.is_some() && db_node.timestamp > seed_node.timestamp {
+                    continue;
                 }
 
                 if depth + 1 >= p2f_ftr.len() {
