@@ -18,7 +18,7 @@ if __name__ == "__main__":
         eval_tasks=[t for t in forecast_tasks if t[0] == "rel-amazon"],
         batch_size=32,
         num_workers=8,
-        subsample_p2f_edges=256,
+        max_bfs_width=256,
         # optimization
         lr=1e-3,
         wd=0.1,

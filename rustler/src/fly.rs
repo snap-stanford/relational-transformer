@@ -227,7 +227,7 @@ pub struct Sampler {
     world_size: usize,
     datasets: Vec<Dataset>,
     items: Vec<Item>,
-    subsample_p2f_edges: usize,
+    max_bfs_width: usize,
     epoch: u64,
     d_text: usize,
     seed: u64,
@@ -245,7 +245,7 @@ impl Sampler {
         seq_len: usize,
         rank: usize,
         world_size: usize,
-        subsample_p2f_edges: usize,
+        max_bfs_width: usize,
         embedding_model: &str,
         d_text: usize,
         seed: u64,
@@ -304,7 +304,7 @@ impl Sampler {
             world_size,
             datasets,
             items,
-            subsample_p2f_edges,
+            max_bfs_width,
             epoch,
             d_text,
             seed,
@@ -413,17 +413,18 @@ impl Sampler {
             let mut db_p2f_ftr: Vec<i32> = Vec::new();
 
             for edge in p2f_edges.iter() {
-                if edge.table_type == ArchivedTableType::Db {
-                    db_p2f_ftr.push(edge.node_idx.into());
-                    continue;
-                }
                 // only include task-table edges if target node belongs to the task table
                 if edge.table_name_idx != seed_node.table_name_idx {
                     continue;
                 }
 
                 // temporal constraint
-                if edge.timestamp.is_some() && seed_node.timestamp.is_some() && edge.timestamp >= seed_node.timestamp {
+                if edge.timestamp.is_some() && seed_node.timestamp.is_some() && edge.timestamp > seed_node.timestamp {
+                    continue;
+                }
+
+                if edge.table_type == ArchivedTableType::Db {
+                    db_p2f_ftr.push(edge.node_idx.into());
                     continue;
                 }
 
@@ -435,20 +436,14 @@ impl Sampler {
                 p2f_ftr[depth + 1].push(edge.node_idx.into());
             }
 
-            let idxs = if db_p2f_ftr.len() > self.subsample_p2f_edges {
-                index::sample(&mut rng, db_p2f_ftr.len(), self.subsample_p2f_edges).into_vec()
+            let idxs = if db_p2f_ftr.len() > self.max_bfs_width {
+                index::sample(&mut rng, db_p2f_ftr.len(), self.max_bfs_width).into_vec()
             } else {
                 (0..db_p2f_ftr.len()).collect::<Vec<_>>()
             };
 
             for idx in idxs.iter() {
                 let node_idx = db_p2f_ftr[*idx];
-                let db_node = get_node(dataset, node_idx);
-
-                if db_node.timestamp.is_some() && seed_node.timestamp.is_some() && db_node.timestamp > seed_node.timestamp {
-                    continue;
-                }
-
                 if depth + 1 >= p2f_ftr.len() {
                     for _i in p2f_ftr.len()..=depth + 1 {
                         p2f_ftr.push(vec![]);
@@ -557,7 +552,7 @@ pub fn main(cli: Cli) {
         cli.seq_len,                // seq_len
         0,                          // rank
         1,                          // world_size
-        256,                        // subsample_p2f_edges
+        256,                        // max_bfs_width
         "all-MiniLM-L12-v2",        // embedding_model
         384,                        // d_text
         0,                          // seed
