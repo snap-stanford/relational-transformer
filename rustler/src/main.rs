@@ -1,4 +1,3 @@
-use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 mod common;
@@ -17,7 +16,7 @@ enum Command {
     Fly(fly::Cli),
 }
 
-fn main() -> Result<()> {
+fn main() {
     let cli = Cli::parse();
     match cli.command {
         Command::Pre(cli) => {
@@ -27,5 +26,4 @@ fn main() -> Result<()> {
             fly::main(cli);
         }
     }
-    Ok(())
 }

@@ -2,7 +2,7 @@
 
 This repository provides a reference implementation
 of the Relational Transformer architecture
-from the paper: [TODO: add arxiv link].
+from the paper: [Relational Transformer: Toward Zero-Shot Foundation Models for Relational Data](https://arxiv.org/abs/2510.06377).
 
 
 ## Installation:
@@ -108,13 +108,6 @@ pixi run torchrun --standalone --nproc_per_node=8 scripts/finetune.py
 ```
 
 
-## Preprocessed Data
-
-Preprocessed data can be downloaded from: TODO.
-
-To use, place at `~/scratch/pre`.
-
-
 ## Pretrained Checkpoints
 
 Pretrained checkpoints can be downloaded from: TODO.
@@ -125,6 +118,15 @@ of the training scripts.
 
 ## Citation
 
-TODO
-
+```bibtex
+@misc{ranjan2025relationaltransformer,
+    title={Relational Transformer: Toward Zero-Shot Foundation Models for Relational Data}, 
+    author={Rishabh Ranjan and Valter Hudovernik and Mark Znidar and Charilaos Kanatsoulis and Roshan Upendra and Mahmoud Mohammadi and Joe Meyer and Tom Palczewski and Carlos Guestrin and Jure Leskovec},
+    year={2025},
+    eprint={2510.06377},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG},
+    url={https://arxiv.org/abs/2510.06377}, 
+}
+```
 

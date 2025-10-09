@@ -22,4 +22,3 @@ rkyv = "*"
 numpy = { version = "*", features = ["half"] }
 indicatif = "*"
 half = { version = "*", features = ["rkyv"] }
-anyhow = "1.0.100"
