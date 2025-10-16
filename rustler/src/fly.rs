@@ -413,8 +413,8 @@ impl Sampler {
             let mut db_p2f_ftr: Vec<i32> = Vec::new();
 
             for edge in p2f_edges.iter() {
-                // only include task-table edges if target node belongs to the task table
-                if edge.table_name_idx != seed_node.table_name_idx {
+                // include edges to task table only if seed node belongs to the task table
+                if edge.table_name_idx != seed_node.table_name_idx && edge.table_type != ArchivedTableType::Db {
                     continue;
                 }
 
@@ -443,7 +443,6 @@ impl Sampler {
             };
 
             for idx in idxs.iter() {
-                let node_idx = db_p2f_ftr[*idx];
                 if depth + 1 >= p2f_ftr.len() {
                     for _i in p2f_ftr.len()..=depth + 1 {
                         p2f_ftr.push(vec![]);

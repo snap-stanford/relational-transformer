@@ -31,7 +31,7 @@ def viz(item, ax, dataset_name):
 
     offsets = {}
     for full_name, meta in table_json.items():
-        base = full_name.split(":", 1)[0]
+        base = full_name
         offsets[base] = int(meta["node_idx_offset"])
 
     offsets_desc = sorted(offsets.items(), key=lambda kv: kv[1], reverse=True)
