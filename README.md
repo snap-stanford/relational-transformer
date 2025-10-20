@@ -51,7 +51,7 @@ pixi run python -m rt.embed rel-f1
 > `rel-amazon`, `rel-avito`, `rel-event`, `rel-f1`, `rel-hm`, `rel-stack`, `rel-trial`
 
 ## Download Preprocessed Data
-This project’s preprocessed data is hosted at **`hvag976/relational-transformer`** on the Hugging Face Hub. You can directly use this data and skip the data preparation step.
+This project’s preprocessed data is hosted at [hvag976/relational-transformer][https://huggingface.co/datasets/hvag976/relational-transformer/tree/main] on the Hugging Face Hub. You can directly use this data and skip the data preparation step.
 
 1. Install the CLI
 ```bash
