@@ -4,9 +4,9 @@ This repository provides a reference implementation
 of the Relational Transformer architecture
 from the paper: [Relational Transformer: Toward Zero-Shot Foundation Models for Relational Data](https://arxiv.org/abs/2510.06377).
 
-![Foundation Model Capabilities of Relational Transformer](assets/intro2.pdf "Foundation Model Capabilities of Relational Transformer")
+![Foundation Model Capabilities of Relational Transformer](assets/intro2.svg "Foundation Model Capabilities of Relational Transformer")
 
-![Overview of the Relational Transformer Architecture](assets/intro1.pdf "Overview of the Relational Transformer Architecture")
+![Overview of the Relational Transformer Architecture](assets/intro1.svg "Overview of the Relational Transformer Architecture")
 
 
 ## Installation:
