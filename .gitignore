@@ -4,3 +4,4 @@ __pycache__
 *.egg-info
 /wandb
 .vscode
+/ckpts
