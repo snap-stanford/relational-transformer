@@ -4,16 +4,16 @@ This repository provides a reference implementation
 of the Relational Transformer architecture
 from the paper: [Relational Transformer: Toward Zero-Shot Foundation Models for Relational Data](https://arxiv.org/abs/2510.06377).
 
-### Foundation Model Capabilities of Relational Transformer
+_🥇 Foundation Model Capabilities of Relational Transformer:_
 
 ![Foundation Model Capabilities of Relational Transformer](assets/intro2.png "Foundation Model Capabilities of Relational Transformer")
 
-### Overview of the Relational Transformer Architecture
+_🤖 Overview of the Relational Transformer Architecture:_
 
 ![Overview of the Relational Transformer Architecture](assets/intro1.png "Overview of the Relational Transformer Architecture")
 
 
-## Installation:
+## Installation
 
 1. Install pixi [https://pixi.sh/latest/#installation](https://pixi.sh/latest/#installation).
 
@@ -28,7 +28,7 @@ pixi run maturin develop --uv --release
 ```
 
 
-## Data Preparation:
+## Data Preparation
 
 1. Download the datasets and tasks from Relbench:
 ```bash
@@ -59,7 +59,7 @@ pixi run python -m rt.embed rel-f1
 > `rel-amazon`, `rel-avito`, `rel-event`, `rel-f1`, `rel-hm`, `rel-stack`, `rel-trial`
 
 ## Download Preprocessed Data
-This project’s preprocessed data is hosted at [hvag976/relational-transformer][https://huggingface.co/datasets/hvag976/relational-transformer/tree/main] on the Hugging Face Hub. You can directly use this data and skip the data preparation step.
+This project’s preprocessed data is hosted at [hvag976/relational-transformer](https://huggingface.co/datasets/hvag976/relational-transformer/tree/main) on the Hugging Face Hub. You can directly use this data and skip the data preparation step.
 
 1. Install the CLI
 ```bash
@@ -81,11 +81,11 @@ huggingface-cli download hvag976/relational-transformer \
 
 ## Download Pretrained Checkpoints
 
-This project's pretrained model checkpoints are hosted at [rishabh-ranjan/relational-transformer](https://huggingface.co/rishabh-ranjan/relational-transformer) on the Hugging Face Hub. You can directly use these checkpoints and skip the pretraining step.
+This project's pretrained model checkpoints are hosted at [rishabh-ranjan/relational-transformer](https://huggingface.co/rishabh-ranjan/relational-transformer/tree/main) on the Hugging Face Hub. You can directly use these checkpoints and skip the pretraining step.
 
 Two kinds of checkpoints are provided:
-- `pretrain_<dataset>_<task>.pt`: pretrained with `<dataset>` held out
-- `contd-pretrain_<dataset>_<task>.pt`: obtained by continued pretraining of `pretrain_<dataset>_<task>.pt` on `<dataset>` with `<task>` held out
+- `pretrain_<dataset>_<task>.pt`: pretrained with `<dataset>` held out.
+- `contd-pretrain_<dataset>_<task>.pt`: obtained by continued pretraining of `pretrain_<dataset>_<task>.pt` on `<dataset>` with `<task>` held out.
 
 To use, pass the checkpoint path to the `load_ckpt_path` argument of the training scripts.
 
@@ -116,24 +116,15 @@ huggingface-cli download rishabh-ranjan/relational-transformer \
 
 ## Experiments
 
-Setup `wandb` with:
-```bash
-pixi run wandb login
-```
-or:
-```bash
-pixi run wandb disabled
-```
+First setup `wandb` with `pixi run wandb login` or `pixi run wandb disabled`. The following example commands replicate the results for `rel-amazon/user-churn`.
 
-The following example commands replicate the results for `rel-amazon/user-churn`.
-
-Pretrain on all datasets with `rel-amazon` held-out
+* Pretrain on all datasets with `rel-amazon` held-out
 (takes about 2 hours on 8xA100 GPUs):
 ```bash
 pixi run torchrun --standalone --nproc_per_node=8 scripts/pretrain.py
 ```
 
-Continued pretrain
+* Continued pretrain
 from best checkpoint obtained above
 on all `rel-amazon` tasks
 with `user-churn` held-out
@@ -142,7 +133,7 @@ with `user-churn` held-out
 pixi run torchrun --standalone --nproc_per_node=8 scripts/contd_pretrain.py
 ```
 
-Finetune
+* Finetune
 from best checkpoint obtained above
 on `rel-amazon/user-churn` task only
 (takes about 1.5 hours on 8xA100 GPUs):
