@@ -79,6 +79,41 @@ huggingface-cli download hvag976/relational-transformer \
   --local-dir-use-symlinks False
 ```  
 
+## Download Pretrained Checkpoints
+
+This project's pretrained model checkpoints are hosted at [rishabh-ranjan/relational-transformer](https://huggingface.co/rishabh-ranjan/relational-transformer) on the Hugging Face Hub. You can directly use these checkpoints and skip the pretraining step.
+
+Two kinds of checkpoints are provided:
+- `pretrain_<dataset>_<task>.pt`: pretrained with `<dataset>` held out
+- `contd-pretrain_<dataset>_<task>.pt`: obtained by continued pretraining of `pretrain_<dataset>_<task>.pt` on `<dataset>` with `<task>` held out
+
+To use, pass the checkpoint path to the `load_ckpt_path` argument of the training scripts.
+
+1. Install the Hugging Face CLI (if not already installed):
+```bash
+pip install -U huggingface_hub
+```
+
+2. Download all checkpoints:
+```bash
+mkdir -p ~/scratch/rt_ckpts
+huggingface-cli download rishabh-ranjan/relational-transformer \
+  --repo-type model \
+  --local-dir ~/scratch/rt_ckpts \
+  --local-dir-use-symlinks False
+```
+
+3. Download a specific checkpoint:
+```bash
+mkdir -p ~/scratch/rt_ckpts
+huggingface-cli download rishabh-ranjan/relational-transformer \
+  --repo-type model \
+  --include "pretrain_rel-amazon_user-churn.pt" \
+  --local-dir ~/scratch/rt_ckpts \
+  --local-dir-use-symlinks False
+```
+
+
 ## Experiments
 
 Setup `wandb` with:
@@ -116,15 +151,10 @@ pixi run torchrun --standalone --nproc_per_node=8 scripts/finetune.py
 ```
 
 
-## Pretrained Checkpoints
-
-Pretrained checkpoints can be downloaded from: TODO.
-
-To use, pass the path to the checkpoint to the `load_ckpt_path` argument
-of the training scripts.
-
 
 ## Citation
+
+Please cite our paper:
 
 ```bibtex
 @misc{ranjan2025relationaltransformer,
