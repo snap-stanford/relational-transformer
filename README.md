@@ -116,7 +116,7 @@ huggingface-cli download rishabh-ranjan/relational-transformer \
 
 ## Experiments
 
-First setup `wandb` with `pixi run wandb login` or `pixi run wandb disabled`. The following example commands replicate the results for `rel-amazon/user-churn`.
+First setup `wandb` with `pixi run wandb login` or `pixi run wandb disabled`. The following example commands replicate the results for `rel-amazon/user-churn` from the paper.
 
 * Pretrain on all datasets with `rel-amazon` held-out
 (takes about 2 hours on 8xA100 GPUs):
