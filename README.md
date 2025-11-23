@@ -121,7 +121,7 @@ First setup `wandb` with `pixi run wandb login` or `pixi run wandb disabled`. Th
 * Pretrain on all datasets with `rel-amazon` held-out
 (takes about 2 hours on 8xA100 GPUs):
 ```bash
-pixi run torchrun --standalone --nproc_per_node=8 scripts/pretrain.py
+pixi run torchrun --standalone --nproc_per_node=8 scripts/example_pretrain.py
 ```
 
 * Continued pretrain
@@ -130,7 +130,7 @@ on all `rel-amazon` tasks
 with `user-churn` held-out
 (takes about 15 minutes on 8xA100 GPUs):
 ```bash
-pixi run torchrun --standalone --nproc_per_node=8 scripts/contd_pretrain.py
+pixi run torchrun --standalone --nproc_per_node=8 scripts/example_contd_pretrain.py
 ```
 
 * Finetune
@@ -138,7 +138,7 @@ from best checkpoint obtained above
 on `rel-amazon/user-churn` task only
 (takes about 1.5 hours on 8xA100 GPUs):
 ```bash
-pixi run torchrun --standalone --nproc_per_node=8 scripts/finetune.py
+pixi run torchrun --standalone --nproc_per_node=8 scripts/example_finetune.py
 ```
 
 

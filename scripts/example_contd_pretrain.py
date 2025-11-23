@@ -9,7 +9,7 @@ if __name__ == "__main__":
         eval_freq=100,
         eval_pow2=True,
         max_eval_steps=40,
-        load_ckpt_path="ckpts/leave_rel-amazon/rel-amazon_user-churn_val_best.pt",
+        load_ckpt_path="ckpts/leave_rel-amazon/rel-amazon_user-churn_best.pt",
         save_ckpt_dir="ckpts/contd_rel-amazon_user-churn/",
         compile_=True,
         seed=0,
