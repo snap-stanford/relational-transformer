@@ -2,6 +2,7 @@
 name = "rustler"
 version = "1.0.0"
 edition = "2024"
+default-run = "rustler"
 
 [lib]
 name = "rustler"
@@ -22,3 +23,7 @@ rkyv = "*"
 numpy = { version = "*", features = ["half"] }
 indicatif = "*"
 half = { version = "*", features = ["rkyv"] }
+
+[[bin]]
+name = "convert-file"
+path = "src/convert-file.rs"

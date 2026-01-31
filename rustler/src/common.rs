@@ -9,7 +9,7 @@ pub struct TableInfo {
     pub num_nodes: i32,
 }
 
-#[derive(Archive, Deserialize, Serialize, Hash, Eq, PartialEq, Default, Clone, Debug)]
+#[derive(Archive, Deserialize, Serialize, Hash, Eq, PartialEq, Default, Clone, Debug, SerdeSerialize, SerdeDeserialize)]
 #[rkyv(derive(PartialEq, Debug))]
 pub enum TableType {
     #[default]
@@ -19,7 +19,7 @@ pub enum TableType {
     Test,
 }
 
-#[derive(Archive, Clone, Debug, Deserialize, Serialize, Default)]
+#[derive(Archive, Clone, Debug, Deserialize, Serialize, Default, SerdeSerialize, SerdeDeserialize)]
 #[rkyv(derive(Debug))]
 pub struct Edge {
     pub node_idx: i32,
@@ -28,12 +28,12 @@ pub struct Edge {
     pub timestamp: Option<i32>,
 }
 
-#[derive(Archive, Serialize, Deserialize, Default)]
+#[derive(Archive, Serialize, Deserialize, Default, SerdeSerialize, SerdeDeserialize)]
 pub struct Adj {
     pub adj: Vec<Vec<Edge>>,
 }
 
-#[derive(Archive, Deserialize, Serialize, Default)]
+#[derive(Archive, Deserialize, Serialize, Default, SerdeSerialize, SerdeDeserialize)]
 #[rkyv(derive(Clone, Debug))]
 pub enum SemType {
     #[default]
@@ -43,7 +43,7 @@ pub enum SemType {
     Boolean,
 }
 
-#[derive(Archive, Deserialize, Serialize, Default)]
+#[derive(Archive, Deserialize, Serialize, Default, SerdeSerialize, SerdeDeserialize)]
 // #[rkyv(derive(Debug))]
 pub struct Node {
     pub is_task_node: bool,
@@ -61,7 +61,7 @@ pub struct Node {
     pub class_value_idx: Vec<i32>,
 }
 
-#[derive(Archive, Deserialize, Serialize, Default)]
+#[derive(Archive, Deserialize, Serialize, Default, SerdeSerialize, SerdeDeserialize)]
 pub struct Offsets {
     pub offsets: Vec<i64>,
 }

@@ -1,5 +1,16 @@
 # Relational Transformer
 
+# Fixes for Windows
+```bash
+Remove-Item -Path C:\Users\User\scratch\relbench -Force
+
+New-Item -ItemType SymbolicLink -Path C:\Users\User\scratch\relbench -Target C:\Users\User\AppData\Local\relbench\relbench\Cache
+
+
+pixi run cargo run --release --bin convert-file -- C:\Users\User\scratch\pre\rel-f1\nodes.rkyv C:\Users\User\scratch\pre\rel-f1\out_nodes.json
+```
+
+
 This repository provides a reference implementation
 of the Relational Transformer architecture
 from the paper: [Relational Transformer: Toward Zero-Shot Foundation Models for Relational Data](https://arxiv.org/abs/2510.06377).

@@ -9,7 +9,7 @@ requires = ["hatchling"]
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["linux-64"]
+platforms = ["linux-64", "win-64"]
 
 [tool.pixi.pypi-dependencies]
 rt = { path = ".", editable = true }
@@ -18,14 +18,15 @@ torch = "==2.6.0"
 wandb = "*"
 einops = "*"
 strictfire = "*"
-maturin = { version = "*", extras = ["patchelf"] }
+maturin = { version = "*", "env-markers" = "sys_platform != 'linux'" }
 ml_dtypes = "*"
 orjson = "*"
 ipykernel = "*"
 scikit-learn = "<1.6.0"
 polars = "*"
-maturin_import_hook = "*"
 matplotlib = "*"
+relbench = "*"
+google-cloud-bigquery = "*"
 
 [tool.pixi.dependencies]
 rust = "*"

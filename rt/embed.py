@@ -52,8 +52,8 @@ def main(
     else:
         device_type = torch.device(device).type
 
-    text_path = f"{os.environ['HOME']}/scratch/pre/{dataset_name}/text.json"
-    with open(text_path) as f:
+    text_path = f"{os.environ['USERPROFILE']}/scratch/pre/{dataset_name}/text.json"
+    with open(text_path, "rb") as f:
         raw = f.read()
     text_list = orjson.loads(raw)
 
@@ -67,7 +67,7 @@ def main(
         device=device
     )
 
-    emb_path = f"{os.environ['HOME']}/scratch/pre/{dataset_name}/text_emb_{embedding_model}.bin"
+    emb_path = f"{os.environ['USERPROFILE']}/scratch/pre/{dataset_name}/text_emb_{embedding_model}.bin"
     emb = np.stack(emb_list).astype(bfloat16)
     emb.tofile(emb_path)
 

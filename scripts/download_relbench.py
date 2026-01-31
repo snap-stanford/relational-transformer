@@ -3,6 +3,9 @@ from relbench.tasks import get_task, get_task_names
 
 if __name__ == "__main__":
     for dataset_name in get_dataset_names():
+        if "mimic" in dataset_name or "dbinfer" in dataset_name:
+            print(f"Skipping dataset: {dataset_name}")
+            continue
         print(f"Downloading dataset: {dataset_name}")
         get_dataset(dataset_name, download=True)
 

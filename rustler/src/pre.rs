@@ -65,7 +65,10 @@ fn cast_col_to_bool(df: DataFrame, col_name: &str) -> Result<DataFrame, PolarsEr
 }
 
 pub fn main(cli: Cli) {
-    let dataset_path = format!("{}/scratch/relbench/{}", var("HOME").unwrap(), cli.db_name);
+    let home = var("USERPROFILE").expect("HOME environment variable not set!");
+    println!("USERPROFILE: {}", home);
+    let dataset_path = format!("{}/scratch/relbench/{}", home, cli.db_name);
+    println!("dataset_path: {}", dataset_path);
 
     let dashes = dataset_path.matches("-").count();
     dbg!(dashes);
@@ -470,9 +473,10 @@ pub fn main(cli: Cli) {
                     node.table_name_idx = table_name_idx;
 
                     let AnyValue::Int64(val) = val else {
-                        dbg!(val);
-                        dbg!(col.name());
-                        panic!()
+                        //dbg!(val);
+                        //dbg!(col.name());
+                        //panic!()
+                        continue;
                     };
                     let pnode_idx = ptable_offset + val as i32;
 
@@ -616,7 +620,7 @@ pub fn main(cli: Cli) {
     pbar.finish();
     println!("done in {:?}.", tic.elapsed());
 
-    let pre_path = format!("{}/scratch/pre/{}", var("HOME").unwrap(), cli.db_name);
+    let pre_path = format!("{}/scratch/pre/{}", var("USERPROFILE").unwrap(), cli.db_name);
     fs::create_dir_all(Path::new(&pre_path)).unwrap();
 
     println!("writing out text...");
