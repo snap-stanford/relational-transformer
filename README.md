@@ -3,7 +3,7 @@
 This repository provides a reference implementation
 for the **ICLR 2026** paper: [Relational Transformer: Toward Zero-Shot Foundation Models for Relational Data](https://arxiv.org/abs/2510.06377).
 
-**Exciting news!** Our followup work improves the pretraining and architecture for Relational Transformer, please check out the [code](https://github.com/snap-stanford/plurel) for the paper [PluRel: Synthetic Data unlocks Scaling Laws for Relational Foundation Models](https://arxiv.org/abs/2602.04029).
+**Exciting news!** Our follow-up work improves the pretraining and architecture for Relational Transformer. Please check out the [code](https://github.com/snap-stanford/plurel) for the paper [PluRel: Synthetic Data unlocks Scaling Laws for Relational Foundation Models](https://arxiv.org/abs/2602.04029).
 
 
 ## Overview
