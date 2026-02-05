@@ -5,6 +5,9 @@ for the **ICLR 2026** paper: [Relational Transformer: Toward Zero-Shot Foundatio
 
 **Exciting news!** Our followup work improves the pretraining and architecture for Relational Transformer, please check out [PluRel: Synthetic Data unlocks Scaling Laws for Relational Foundation Models](https://arxiv.org/abs/2602.04029) [(code)](https://github.com/snap-stanford/plurel).
 
+
+## Overview
+
 _🥇 Foundation Model Capabilities of Relational Transformer:_
 
 ![Foundation Model Capabilities of Relational Transformer](assets/intro2.png "Foundation Model Capabilities of Relational Transformer")
