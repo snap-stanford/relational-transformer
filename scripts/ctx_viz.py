@@ -28,18 +28,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-import maturin_import_hook
 import numpy as np
-from maturin_import_hook.settings import MaturinSettings
 
-# Auto-rebuild the rustler crate (release mode) on import if its sources
-# have changed since the last build. Mirrors rt/data.py so that running
-# `python scripts/ctx_viz.py` directly (no pixi wrapper) also gets the
-# latest sampler.
-maturin_import_hook.install(settings=MaturinSettings(release=True, uv=True))
-
-from rt.data import MAX_F2P_NBRS, RustlerDataset, get_column_index  # noqa: E402
-from rt.pre import resolve_pre_dir, resolve_repo  # noqa: E402
+from rt.data import MAX_F2P_NBRS, RustlerDataset, get_column_index
+from rt.pre import resolve_pre_dir, resolve_repo
 
 SEM_TYPE_NAMES = ["number", "text", "datetime", "boolean"]
 INT_MIN = np.iinfo(np.int32).min  # rustler uses i32::MIN as missing-timestamp sentinel
@@ -652,7 +644,7 @@ def _list_dbs(root_arg: str) -> list[str]:
     files = HfApi().list_repo_files(repo_id, repo_type="dataset")
     return sorted(
         {
-            f[len(prefix):].split("/", 1)[0]
+            f[len(prefix) :].split("/", 1)[0]
             for f in files
             if f.startswith(prefix) and f.endswith("/nodes.rkyv")
         }
@@ -2425,7 +2417,7 @@ function renderMasks() {
   const tokens = state.payload.tokens;
   const S = tokens.length;
   // Compute the three boolean masks the model uses, modulo padding.
-  // (we mirror the python code in rt/model.py).
+  // (we mirror the python code in src/rt/model.py).
   const isPad = tokens.map(t => t.is_padding);
   const node = tokens.map(t => t.node_idx);
   const f2p = tokens.map(t => t.f2p_nbr_idxs);

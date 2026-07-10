@@ -3,7 +3,7 @@ signaled. Ported from the rt research repo's scripts/mlock_recipe.py.
 
 Usage:
     pixi run python scripts/mlock_recipe.py \
-        --pre-dir <pre_dir> [--include-dbs-file rt/recipe_rt_j.txt] \
+        --pre-dir <pre_dir> [--include-dbs-file scripts/recipe_rt_j.txt] \
         [--embedding-model-ref all-MiniLM-L12-v2] [--workers 8]
 
 mmap+mlocks {pre_dir}/{db}/{nodes.rkyv, text_emb_<ref>.bin, p2f_adj.rkyv} for
@@ -22,7 +22,6 @@ import ctypes.util
 import os
 import signal
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 
 from tqdm import tqdm
 
@@ -80,7 +79,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pre-dir", required=True)
     ap.add_argument("--include-dbs-file", default=None,
-                    help="restrict to the dbs in this file (e.g. rt/recipe_rt_j.txt); "
+                    help="restrict to the dbs in this file (e.g. scripts/recipe_rt_j.txt); "
                          "without it, every preprocessed db under --pre-dir is locked.")
     ap.add_argument("--embedding-model-ref", default="all-MiniLM-L12-v2")
     ap.add_argument("--workers", type=int, default=32,

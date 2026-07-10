@@ -2332,7 +2332,7 @@ pub fn column_sem_types(pre_dir: String, db_name: String) -> PyResult<HashMap<St
         column_index.iter().map(|(k, v)| (*v, k)).collect();
 
     let mut out: HashMap<String, String> = HashMap::new();
-    for (_key, info) in table_info.iter() {
+    for info in table_info.values() {
         if info.num_nodes <= 0 {
             continue;
         }

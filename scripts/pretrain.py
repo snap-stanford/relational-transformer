@@ -187,7 +187,7 @@ def main() -> None:
     ap.add_argument("--include-dbs-file", default=None,
                     help="restrict the pretraining mixture to the databases listed "
                          "in this file (one db name per line; '#' comments and blank "
-                         "lines ignored). Use rt/recipe_rt_j.txt to reproduce the "
+                         "lines ignored). Use scripts/recipe_rt_j.txt to reproduce the "
                          "curated mixture the released RT-J checkpoints were trained "
                          "on. Without it, every preprocessed db under --pre-dir is "
                          "used.")

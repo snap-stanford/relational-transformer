@@ -4,7 +4,7 @@ version = "1.0.0"
 edition = "2024"
 
 [lib]
-name = "rustler"
+name = "_rustler"
 crate-type = ["cdylib"]
 
 # `pre`: build the standalone preprocessor (reads parquet via polars, parses

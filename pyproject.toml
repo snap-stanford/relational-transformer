@@ -1,11 +1,44 @@
-[project]
-name = "rt"
-version = "2.0.0"
-dependencies = ["tabicl>=2.1.1,<3"]
-
 [build-system]
-build-backend = "hatchling.build"
-requires = ["hatchling"]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "relational-transformer"
+version = "1.1.0"
+description = "Relational Transformer (RT): a foundation model for relational data, bundling a native Rust data-processing engine (rt._rustler)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "torch",
+    "safetensors",
+    "huggingface-hub",
+    "sentence-transformers",
+    "numpy",
+    "einops",
+    "ml_dtypes",
+    "orjson",
+    "lazy_loader",
+    "tqdm",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+# `eval` (rt.eval_utils) also needs relbench, a git dependency that can't be
+# declared here (PyPI forbids URL deps) -- install it manually:
+#   pip install "git+https://github.com/snap-stanford/relbench.git@<rev>"
+eval = ["scikit-learn<1.6.0"]
+test = ["pytest", "pyarrow", "plurel"]
+
+[tool.maturin]
+python-source = "src"
+manifest-path = "rustler/Cargo.toml"
+module-name = "rt._rustler"
+# `pre` bundles the polars preprocess pyfunction; FAISS (`vecdb`) stays source-only.
+features = ["pyo3/extension-module", "pre"]
+exclude = ["**/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
@@ -21,7 +54,7 @@ uv = "*"
 matplotlib = ">=3.11.0,<4"
 
 [tool.pixi.pypi-dependencies]
-rt = { path = ".", editable = true }
+relational-transformer = { path = ".", editable = true }
 torch = "*"
 safetensors = "*"
 sentence-transformers = "*"
@@ -37,6 +70,8 @@ einops = "*"
 scikit-learn = "<1.6.0"
 pandas = "*"
 pyarrow = "*"
+pytest = "*"
+plurel = "*"
 lazy_loader = "*"
 tqdm = "*"
 wandb = "*"
@@ -47,14 +82,14 @@ relbench = { git = "https://github.com/snap-stanford/relbench.git", rev = "6e4a3
 [tool.pixi.tasks]
 # Standalone preprocessor binary (polars + manifest reader; no FAISS).
 build-pre = "cargo build --release --features pre --manifest-path rustler/Cargo.toml"
-# Sampler Python extension (FAISS-free). The opt-in FAISS vector-db Sampler is
-# built manually: `maturin develop --release -m rustler/Cargo.toml --features vecdb`
-# (that path additionally needs cmake + a BLAS to build FAISS).
-build-sampler = "maturin develop --uv --release -m rustler/Cargo.toml"
+# Build + editable-install the rt package and the rt._rustler extension from the
+# root maturin project (FAISS-free). The opt-in FAISS vector-db Sampler is built
+# manually: `maturin develop --release --features vecdb` (needs cmake + a BLAS).
+build-sampler = "maturin develop --uv --release"
 # Preprocess one dataset: download (HF or local) -> rustler -> embeddings.
-preprocess = { cmd = "python scripts/preprocess.py one", depends-on = ["build-pre"] }
+preprocess = { cmd = "python scripts/preprocess.py one", depends-on = ["build-sampler"] }
 # Preprocess many datasets from a HuggingFace collection repo.
-preprocess-many = { cmd = "python scripts/preprocess.py many", depends-on = ["build-pre"] }
+preprocess-many = { cmd = "python scripts/preprocess.py many", depends-on = ["build-sampler"] }
 # Upload an already-preprocessed dataset directory to a HuggingFace repo.
 upload = "python scripts/preprocess.py upload"
 # Context visualizer (serves an HTTP UI over preprocessed data).
@@ -63,3 +98,4 @@ pretrain = { cmd = "torchrun --standalone --nproc-per-node=auto scripts/pretrain
 # eval is single-process (one GPU) so per-item rows stay in task-table order.
 eval = { cmd = "python scripts/eval.py", depends-on = ["build-sampler"] }
 baseline = { cmd = "python scripts/baseline.py", depends-on = ["build-sampler"] }
+test = { cmd = "pytest", depends-on = ["build-sampler"] }

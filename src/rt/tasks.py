@@ -90,7 +90,7 @@ def _autocomplete_tasks(pre_dir: str, db: str, splits, task_types) -> list[Task]
     """
     if "train" not in splits:
         return []
-    from rustler import column_sem_types
+    from rt._rustler import column_sem_types
 
     sem = column_sem_types(pre_dir, db)
     excluded = _pkey_time_cols(pre_dir, db)

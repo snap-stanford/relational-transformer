@@ -153,5 +153,5 @@ nearest-neighbor context retrieval) is built manually and additionally needs
 cmake + a BLAS:
 
 ```bash
-maturin develop --release -m rustler/Cargo.toml --features vecdb
+maturin develop --release --features vecdb
 ```

@@ -1,5 +1,4 @@
 import orjson
-import strictfire
 import torch
 from ml_dtypes import bfloat16
 from sentence_transformers import SentenceTransformer
@@ -76,4 +75,8 @@ def main(
 
 
 if __name__ == "__main__":
+    # Lazy: strictfire imports the stdlib `pipes` (gone in 3.13); a top-level
+    # import would cap the package at 3.12.
+    import strictfire
+
     strictfire.StrictFire(main)

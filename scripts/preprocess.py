@@ -33,14 +33,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from pathlib import Path
 
 from huggingface_hub import HfApi, hf_hub_download, snapshot_download
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-RUSTLER_BIN = REPO_ROOT / "rustler" / "target" / "release" / "rustler"
 
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L12-v2"
 DEFAULT_BATCH_SIZE = 1024
@@ -122,21 +118,10 @@ def dataset_name(dataset_dir: Path) -> str:
 def run_rustler_pre(
     dataset_dir: Path, out_dir: Path, source: str, skip_tasks: bool
 ) -> None:
-    if not RUSTLER_BIN.exists():
-        raise FileNotFoundError(
-            f"rustler binary not found at {RUSTLER_BIN}. Build it with "
-            f"`pixi run build-pre`."
-        )
-    cmd = [
-        str(RUSTLER_BIN), "pre",
-        "--dataset-dir", str(dataset_dir),
-        "--out-dir", str(out_dir),
-        "--source", source,
-    ]
-    if skip_tasks:
-        cmd.append("--skip-tasks")
-    print("+", " ".join(cmd), flush=True)
-    subprocess.run(cmd, check=True)
+    from rt._rustler import preprocess
+
+    print(f"+ preprocess {dataset_dir} -> {out_dir}", flush=True)
+    preprocess(str(dataset_dir), str(out_dir), source=source, skip_tasks=skip_tasks)
 
 
 def embed_dataset(

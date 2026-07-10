@@ -66,11 +66,10 @@ if [ -n "${WANDB_PROJECT:-}" ]; then
   WANDB_FLAGS="--wandb --wandb-project $WANDB_PROJECT --wandb-name ${WANDB_NAME:-rt-pretrain}"
 fi
 
-# rustler (the sampler extension) is built into the pixi env per node, NOT
-# rebuilt on import: the maturin import hook would otherwise have every rank
-# trigger a concurrent `cargo build` racing on the same target/ dir under
-# `pixi run`, which fails the rename of librustler.so. Build once up front and
-# disable the hook for the workers.
+# The rt._rustler sampler extension is built once into the pixi env per node by
+# the `build-sampler` task (maturin develop), NOT rebuilt on import. Keep
+# MATURIN_IMPORT_HOOK_ENABLED=0 as a guard so a stray global maturin import hook
+# can't have every rank trigger a concurrent `cargo build` racing on target/.
 export MATURIN_IMPORT_HOOK_ENABLED=0
 
 # Static rendezvous: derive the master from the Slurm nodelist and use a unique

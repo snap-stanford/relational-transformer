@@ -5,17 +5,12 @@ from functools import cache
 from pathlib import Path
 
 import ml_dtypes  # noqa: F401  # registers bfloat16 numpy dtype for rustler
-import maturin_import_hook
 import numpy as np
 import torch
-from maturin_import_hook.settings import MaturinSettings
 from torch.utils.data import Dataset, IterableDataset
 
+from rt._rustler import Sampler
 from rt.pre import resolve_pre_dir
-
-maturin_import_hook.install(settings=MaturinSettings(release=True, uv=True))
-
-from rustler import Sampler  # noqa: E402
 
 # rustler's Sampler is an unpicklable Rust object, so any DataLoader over a
 # RustlerDataset must use the 'fork' start method -- Python 3.14 defaults to
@@ -151,9 +146,7 @@ class RustlerDataset:
 
         # `pre_dir` may be a local path or a HuggingFace repo spec; resolve to a
         # local root, downloading only the files needed for these databases.
-        pre_dir = resolve_pre_dir(
-            pre_dir, [t[0] for t in tasks], embedding_model
-        )
+        pre_dir = resolve_pre_dir(pre_dir, [t[0] for t in tasks], embedding_model)
         if vector_db_path is not None:
             vector_db_path = str(Path(vector_db_path).expanduser())
 
